@@ -6,7 +6,6 @@
   <title>Gesture Snake</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-
     body {
       background: #f0f4f0;
       color: #1a1a1a;
@@ -19,21 +18,9 @@
       gap: 14px;
       padding: 20px;
     }
+    h1 { font-size: 1.8rem; letter-spacing: 3px; color: #2e7d32; font-weight: 800; }
+    #status { font-size: 0.82rem; color: #555; height: 18px; }
 
-    h1 {
-      font-size: 1.8rem;
-      letter-spacing: 3px;
-      color: #2e7d32;
-      font-weight: 800;
-    }
-
-    #status {
-      font-size: 0.82rem;
-      color: #555;
-      height: 18px;
-    }
-
-    /* Mode tabs */
     #modeTabs {
       display: flex;
       background: #fff;
@@ -42,7 +29,6 @@
       gap: 4px;
       box-shadow: 0 1px 6px rgba(0,0,0,0.1);
     }
-
     .modeBtn {
       padding: 8px 22px;
       border: none;
@@ -54,86 +40,110 @@
       background: transparent;
       color: #666;
     }
+    .modeBtn.active { background: #2e7d32; color: #fff; box-shadow: 0 2px 8px rgba(46,125,50,0.3); }
+    .modeBtn:not(.active):hover { background: #e8f5e9; color: #2e7d32; }
 
-    .modeBtn.active {
-      background: #2e7d32;
-      color: #fff;
-      box-shadow: 0 2px 8px rgba(46,125,50,0.3);
-    }
-
-    .modeBtn:not(.active):hover {
-      background: #e8f5e9;
-      color: #2e7d32;
-    }
-
-    #arena {
-      display: flex;
-      gap: 16px;
-      align-items: flex-start;
-    }
-
+    #arena { display: flex; gap: 16px; align-items: flex-start; }
     #gameCanvas {
-      border: 2px solid #c8e6c9;
-      border-radius: 10px;
-      background: #fff;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      border: 2px solid #c8e6c9; border-radius: 10px;
+      background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,0.08);
     }
-
-    #sidebar {
-      width: 220px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
+    #sidebar { width: 220px; display: flex; flex-direction: column; gap: 10px; }
     #camCanvas {
-      width: 220px;
-      height: 165px;
-      border: 2px solid #c8e6c9;
-      border-radius: 10px;
-      transform: scaleX(-1);
-      background: #e8f5e9;
+      width: 220px; height: 165px;
+      border: 2px solid #c8e6c9; border-radius: 10px;
+      transform: scaleX(-1); background: #e8f5e9;
       box-shadow: 0 2px 8px rgba(0,0,0,0.07);
     }
-
     .card {
-      background: #fff;
-      border-radius: 10px;
-      padding: 12px 14px;
-      font-size: 0.78rem;
-      color: #444;
-      line-height: 1.7;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.07);
-      border: 1px solid #e8f5e9;
+      background: #fff; border-radius: 10px; padding: 12px 14px;
+      font-size: 0.78rem; color: #444; line-height: 1.7;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.07); border: 1px solid #e8f5e9;
     }
-
     .card b { color: #2e7d32; }
+    #scoreDisplay { font-size: 1rem; font-weight: 700; color: #1a1a1a; }
+    #dirDisplay { font-size: 1.6rem; text-align: center; }
 
-    #scoreDisplay {
-      font-size: 1rem;
-      font-weight: 700;
-      color: #1a1a1a;
+    /* Calibration overlay */
+    #calibOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(240,244,240,0.97);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      gap: 20px;
     }
-
-    #dirDisplay {
-      font-size: 1.6rem;
-      text-align: center;
+    #calibOverlay.show { display: flex; }
+    #calibTitle { font-size: 1.4rem; font-weight: 700; color: #2e7d32; }
+    #calibSub { font-size: 0.95rem; color: #555; max-width: 420px; text-align: center; }
+    #calibScreen {
+      position: relative;
+      width: 600px; height: 400px;
+      background: #fff;
+      border-radius: 16px;
+      border: 2px solid #c8e6c9;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      overflow: hidden;
     }
-
-    #instructions { display: block; }
+    .calibDot {
+      position: absolute;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: #c8e6c9;
+      border: 3px solid #a5d6a7;
+      transform: translate(-50%, -50%);
+      transition: background 0.3s, transform 0.3s;
+    }
+    .calibDot.active {
+      background: #2e7d32;
+      border-color: #1b5e20;
+      transform: translate(-50%, -50%) scale(1.3);
+    }
+    .calibDot.done {
+      background: #81c784;
+      border-color: #4caf50;
+    }
+    #calibProgress {
+      width: 600px; height: 8px;
+      background: #e8f5e9; border-radius: 4px; overflow: hidden;
+    }
+    #calibBar {
+      height: 100%; background: #2e7d32; border-radius: 4px;
+      transition: width 0.1s linear;
+      width: 0%;
+    }
+    #calibBtn {
+      padding: 12px 32px;
+      background: #2e7d32; color: #fff;
+      border: none; border-radius: 10px;
+      font-size: 1rem; font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(46,125,50,0.3);
+    }
+    #calibBtn:hover { background: #1b5e20; }
+    #recalibBtn {
+      padding: 6px 16px;
+      background: transparent; color: #2e7d32;
+      border: 1.5px solid #2e7d32; border-radius: 8px;
+      font-size: 0.78rem; font-weight: 600;
+      cursor: pointer;
+    }
+    #recalibBtn:hover { background: #e8f5e9; }
   </style>
 </head>
 <body>
 
   <h1>🐍 GESTURE SNAKE</h1>
 
-  <!-- Mode switcher -->
   <div id="modeTabs">
     <button class="modeBtn active" id="btnHand" onclick="switchMode('hand')">🖐 Hand Track</button>
     <button class="modeBtn" id="btnEye" onclick="switchMode('eye')">👁 Eye Track</button>
   </div>
 
-  <div id="status">Loading model...</div>
+  <div id="status">Loading models...</div>
 
   <div id="arena">
     <canvas id="gameCanvas" width="500" height="500"></canvas>
@@ -142,7 +152,20 @@
       <div class="card"><div id="scoreDisplay">Score: 0 &nbsp;|&nbsp; Best: 0</div></div>
       <div class="card" id="dirDisplay">👆</div>
       <div class="card" id="instructions"></div>
+      <button id="recalibBtn" style="display:none" onclick="startCalibration()">🔄 Recalibrate Eyes</button>
     </div>
+  </div>
+
+  <!-- Calibration overlay -->
+  <div id="calibOverlay">
+    <div id="calibTitle">👁 Eye Calibration</div>
+    <div id="calibSub">Look at each green dot as it lights up. Hold your gaze until it moves to the next one.</div>
+    <div id="calibScreen">
+      <!-- dots injected by JS -->
+    </div>
+    <div id="calibProgress"><div id="calibBar"></div></div>
+    <div id="calibStatus" style="font-size:0.85rem;color:#555;"></div>
+    <button id="calibBtn" onclick="startCalibration()">Start Calibration</button>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
@@ -161,117 +184,191 @@
     let score = 0, best = 0, gameOver = false, lastTick = 0;
     let gestureDir = '👆';
 
-    // ── Canvas ────────────────────────────────────────────────────────────────
+    // ── Canvases ──────────────────────────────────────────────────────────────
     const gameCanvas = document.getElementById('gameCanvas');
     const gc = gameCanvas.getContext('2d');
     const camCanvas = document.getElementById('camCanvas');
     const cc = camCanvas.getContext('2d');
 
-    // ── Mode ──────────────────────────────────────────────────────────────────
+    // ── Mode & detectors ──────────────────────────────────────────────────────
     let currentMode = 'hand';
-    let handDetector = null, faceDetector = null;
-    let video = null;
+    let handDetector = null, faceDetector = null, video = null;
 
-    const EMOJI = { '1,0': '👉', '-1,0': '👈', '0,1': '👇', '0,-1': '👆' };
+    // ── Eye calibration data ──────────────────────────────────────────────────
+    // We sample gaze at 9 points: corners, edges, center
+    // Store the raw normalized gaze (gazeX, gazeY) at each known screen position
+    let calibrated = false;
+    let gazeMinX = 0.3, gazeMaxX = 0.7; // fallback defaults
+    let gazeMinY = 0.3, gazeMaxY = 0.7;
 
-    const INSTRUCTIONS = {
-      hand: `<b>Hand Track:</b><br>Point your index finger to steer.<br><br>☝️ up &nbsp; 👇 down<br>👈 left &nbsp; 👉 right<br><br>Press <b>R</b> to restart.`,
-      eye:  `<b>Eye Track:</b><br>Look in the direction you want<br>the snake to go.<br><br>👀 Look up/down/left/right<br><br>Press <b>R</b> to restart.`
-    };
+    // Calibration points: [screenXpct, screenYpct, label]
+    const CALIB_POINTS = [
+      [0.5,  0.5,  'center'],
+      [0.1,  0.1,  'top-left'],
+      [0.9,  0.1,  'top-right'],
+      [0.1,  0.9,  'bottom-left'],
+      [0.9,  0.9,  'bottom-right'],
+      [0.5,  0.1,  'top'],
+      [0.5,  0.9,  'bottom'],
+      [0.1,  0.5,  'left'],
+      [0.9,  0.5,  'right'],
+    ];
 
-    function switchMode(mode) {
-      currentMode = mode;
-      document.getElementById('btnHand').classList.toggle('active', mode === 'hand');
-      document.getElementById('btnEye').classList.toggle('active', mode === 'eye');
-      document.getElementById('instructions').innerHTML = INSTRUCTIONS[mode];
+    let calibState = { running: false, step: -1, samples: [], dotEls: [] };
+    const CALIB_HOLD_MS = 1200; // ms to stare at each dot
+    const CALIB_SAMPLES = 20;   // samples to average per dot
+
+    function buildCalibDots() {
+      const screen = document.getElementById('calibScreen');
+      screen.innerHTML = '';
+      calibState.dotEls = [];
+      for (const [px, py] of CALIB_POINTS) {
+        const d = document.createElement('div');
+        d.className = 'calibDot';
+        d.style.left = `${px * 100}%`;
+        d.style.top  = `${py * 100}%`;
+        screen.appendChild(d);
+        calibState.dotEls.push(d);
+      }
     }
 
-    switchMode('hand');
+    async function startCalibration() {
+      if (!faceDetector) return;
+      document.getElementById('calibBtn').style.display = 'none';
+      document.getElementById('calibOverlay').classList.add('show');
+      buildCalibDots();
+      calibState.running = true;
+      calibState.step = 0;
+      calibState.samples = Array.from({length: CALIB_POINTS.length}, () => []);
 
-    // ── Camera ────────────────────────────────────────────────────────────────
-    async function setupCamera() {
-      const v = document.createElement('video');
-      v.width = 293; v.height = 220;
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      v.srcObject = stream;
-      await new Promise(r => v.onloadedmetadata = r);
-      v.play();
-      return v;
+      for (let i = 0; i < CALIB_POINTS.length; i++) {
+        calibState.step = i;
+        // Highlight current dot
+        calibState.dotEls.forEach((d, j) => {
+          d.className = 'calibDot' + (j < i ? ' done' : j === i ? ' active' : '');
+        });
+        document.getElementById('calibStatus').textContent =
+          `Look at the green dot (${i + 1} / ${CALIB_POINTS.length})`;
+
+        // Collect samples over CALIB_HOLD_MS
+        const start = performance.now();
+        while (performance.now() - start < CALIB_HOLD_MS) {
+          const elapsed = performance.now() - start;
+          document.getElementById('calibBar').style.width =
+            `${((i + elapsed / CALIB_HOLD_MS) / CALIB_POINTS.length) * 100}%`;
+
+          const g = await getRawGaze();
+          if (g) calibState.samples[i].push(g);
+          await sleep(50);
+        }
+        calibState.dotEls[i].className = 'calibDot done';
+      }
+
+      // Compute calibration from samples
+      applyCalibration(calibState.samples);
+      calibrated = true;
+      calibState.running = false;
+
+      document.getElementById('calibBar').style.width = '100%';
+      document.getElementById('calibStatus').textContent = '✅ Calibration complete!';
+      document.getElementById('recalibBtn').style.display = 'block';
+
+      await sleep(800);
+      document.getElementById('calibOverlay').classList.remove('show');
+    }
+
+    function applyCalibration(samples) {
+      // samples[i] = array of {x, y} raw gaze for CALIB_POINTS[i]
+      const avgs = samples.map(pts => {
+        if (!pts.length) return null;
+        const mx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+        const my = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+        return { x: mx, y: my };
+      }).filter(Boolean);
+
+      if (avgs.length < 3) return;
+
+      gazeMinX = Math.min(...avgs.map(p => p.x));
+      gazeMaxX = Math.max(...avgs.map(p => p.x));
+      gazeMinY = Math.min(...avgs.map(p => p.y));
+      gazeMaxY = Math.max(...avgs.map(p => p.y));
+
+      // Shrink range slightly so edges are easier to hit
+      const padX = (gazeMaxX - gazeMinX) * 0.1;
+      const padY = (gazeMaxY - gazeMinY) * 0.1;
+      gazeMinX += padX; gazeMaxX -= padX;
+      gazeMinY += padY; gazeMaxY -= padY;
+    }
+
+    // ── Raw gaze extraction ───────────────────────────────────────────────────
+    async function getRawGaze() {
+      if (!faceDetector || !video) return null;
+      const faces = await faceDetector.estimateFaces(video);
+      if (!faces.length) return null;
+      return extractRawGaze(faces[0].keypoints);
+    }
+
+    function extractRawGaze(kp) {
+      const lIris = kp[468], rIris = kp[473];
+      if (!lIris || !rIris) return null;
+
+      // Eye corners
+      const lOuter = kp[33],  lInner = kp[133];
+      const rOuter = kp[362], rInner = kp[263];
+      const lTop   = kp[159], lBot   = kp[145];
+      const rTop   = kp[386], rBot   = kp[374];
+
+      const lEyeW = Math.abs(lInner.x - lOuter.x) || 1;
+      const rEyeW = Math.abs(rInner.x - rOuter.x) || 1;
+      const lEyeH = Math.abs(lBot.y   - lTop.y)   || 1;
+      const rEyeH = Math.abs(rBot.y   - rTop.y)   || 1;
+
+      // Normalized iris position within each eye [0..1]
+      const lGazeX = (lIris.x - lOuter.x) / lEyeW;
+      const rGazeX = (rIris.x - rOuter.x) / rEyeW;
+      const lGazeY = (lIris.y - lTop.y)   / lEyeH;
+      const rGazeY = (rIris.y - rTop.y)   / rEyeH;
+
+      return {
+        x: (lGazeX + rGazeX) / 2,
+        y: (lGazeY + rGazeY) / 2,
+      };
+    }
+
+    // ── Direction from calibrated gaze ────────────────────────────────────────
+    function getEyeDirection(kp) {
+      const raw = extractRawGaze(kp);
+      if (!raw) return null;
+
+      const rangeX = (gazeMaxX - gazeMinX) || 0.1;
+      const rangeY = (gazeMaxY - gazeMinY) || 0.1;
+
+      // Map raw gaze to [-1, 1] using calibrated range
+      const nx = ((raw.x - gazeMinX) / rangeX) * 2 - 1; // -1=left, +1=right (mirrored)
+      const ny = ((raw.y - gazeMinY) / rangeY) * 2 - 1; // -1=up,   +1=down
+
+      // Relative to snake: only trigger if gaze is clearly away from center
+      // Use a smaller deadzone so small movements count
+      const DEAD = 0.25;
+
+      // Which axis is stronger?
+      if (Math.abs(nx) > Math.abs(ny)) {
+        if (nx >  DEAD) return { x: -1, y: 0 }; // mirrored: gaze right pixel → left
+        if (nx < -DEAD) return { x:  1, y: 0 };
+      } else {
+        if (ny >  DEAD) return { x: 0, y: 1 };
+        if (ny < -DEAD) return { x: 0, y: -1 };
+      }
+      return null; // dead zone — hold current direction
     }
 
     // ── Hand tracking ─────────────────────────────────────────────────────────
-    async function loadHandModel() {
-      return handPoseDetection.createDetector(
-        handPoseDetection.SupportedModels.MediaPipeHands,
-        { runtime: 'tfjs', modelType: 'lite', maxHands: 1 }
-      );
-    }
-
     function getHandDirection(keypoints) {
-      const wrist    = keypoints[0];
-      const indexTip = keypoints[8];
-      const dx = indexTip.x - wrist.x;
+      const wrist = keypoints[0], indexTip = keypoints[8];
+      const dx = -(indexTip.x - wrist.x); // mirrored
       const dy = indexTip.y - wrist.y;
-      const realDx = -dx; // mirrored canvas
-      if (Math.abs(realDx) > Math.abs(dy)) {
-        return realDx > 0 ? { x: 1, y: 0 } : { x: -1, y: 0 };
-      }
-      return dy > 0 ? { x: 0, y: 1 } : { x: 0, y: -1 };
-    }
-
-    // ── Eye tracking ──────────────────────────────────────────────────────────
-    async function loadFaceModel() {
-      return faceLandmarksDetection.createDetector(
-        faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
-        { runtime: 'tfjs', refineLandmarks: true, maxFaces: 1 }
-      );
-    }
-
-    // MediaPipe Face Mesh iris indices (with refineLandmarks: true)
-    // Left iris center: 468, Right iris center: 473
-    // Left eye corners: 33 (outer), 133 (inner)
-    // Right eye corners: 362 (outer), 263 (inner)
-    function getEyeDirection(keypoints) {
-      const lIris  = keypoints[468];
-      const rIris  = keypoints[473];
-      const lOuter = keypoints[33];
-      const lInner = keypoints[133];
-      const rOuter = keypoints[362];
-      const rInner = keypoints[263];
-
-      if (!lIris || !rIris) return null;
-
-      // Normalize iris position within each eye horizontally
-      const lEyeW = Math.abs(lInner.x - lOuter.x);
-      const rEyeW = Math.abs(rInner.x - rOuter.x);
-      const lGazeX = (lIris.x - lOuter.x) / (lEyeW || 1);
-      const rGazeX = (rIris.x - rOuter.x) / (rEyeW || 1);
-      const gazeX = (lGazeX + rGazeX) / 2; // 0=look left, 1=look right (mirrored)
-
-      // Vertical: use both irises relative to eye top/bottom
-      const lTop    = keypoints[159]; const lBot = keypoints[145];
-      const rTop    = keypoints[386]; const rBot = keypoints[374];
-      const lEyeH   = Math.abs(lBot.y - lTop.y);
-      const rEyeH   = Math.abs(rBot.y - rTop.y);
-      const lGazeY  = (lIris.y - lTop.y) / (lEyeH || 1);
-      const rGazeY  = (rIris.y - rTop.y) / (rEyeH || 1);
-      const gazeY   = (lGazeY + rGazeY) / 2; // 0=look up, 1=look down
-
-      // Deadzone in center to avoid accidental triggers
-      const H_THRESH = 0.15; // horizontal sensitivity
-      const V_THRESH = 0.18; // vertical sensitivity
-
-      const hOffset = gazeX - 0.5; // negative = looking left, positive = looking right
-      const vOffset = gazeY - 0.5; // negative = looking up, positive = looking down
-
-      if (Math.abs(hOffset) > Math.abs(vOffset)) {
-        if (hOffset > H_THRESH)  return { x: -1, y: 0 }; // mirrored: gaze right = snake left... actually let's keep natural
-        if (hOffset < -H_THRESH) return { x: 1, y: 0 };
-      } else {
-        if (vOffset > V_THRESH)  return { x: 0, y: 1 };
-        if (vOffset < -V_THRESH) return { x: 0, y: -1 };
-      }
-      return null; // in deadzone — keep current direction
+      if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? { x:1,y:0 } : { x:-1,y:0 };
+      return dy > 0 ? { x:0,y:1 } : { x:0,y:-1 };
     }
 
     // ── Detection loop ────────────────────────────────────────────────────────
@@ -292,161 +389,160 @@
         if (faces.length > 0) {
           const kp = faces[0].keypoints;
           d = getEyeDirection(kp);
-          drawIrisOverlay(kp);
+          drawIrisOverlay(kp, d);
         }
       }
 
       if (d && (d.x !== -direction.x || d.y !== -direction.y)) {
         nextDirection = d;
+        gestureDir = EMOJI[`${d.x},${d.y}`] || gestureDir;
       }
-      if (d) gestureDir = EMOJI[`${d.x},${d.y}`] || gestureDir;
       document.getElementById('dirDisplay').textContent = gestureDir;
 
       requestAnimationFrame(detectionLoop);
     }
 
-    // ── Drawing overlays ──────────────────────────────────────────────────────
+    // ── Overlays ──────────────────────────────────────────────────────────────
     function drawHandSkeleton(kp) {
-      const connections = [
-        [0,1],[1,2],[2,3],[3,4],
-        [0,5],[5,6],[6,7],[7,8],
-        [0,9],[9,10],[10,11],[11,12],
-        [0,13],[13,14],[14,15],[15,16],
-        [0,17],[17,18],[18,19],[19,20],
-        [5,9],[9,13],[13,17],
-      ];
-      cc.strokeStyle = '#2e7d32';
-      cc.lineWidth = 2;
-      for (const [a, b] of connections) {
-        cc.beginPath();
-        cc.moveTo(kp[a].x, kp[a].y);
-        cc.lineTo(kp[b].x, kp[b].y);
-        cc.stroke();
+      const C = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],
+                 [0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
+      cc.strokeStyle = '#2e7d32'; cc.lineWidth = 2;
+      for (const [a,b] of C) {
+        cc.beginPath(); cc.moveTo(kp[a].x, kp[a].y); cc.lineTo(kp[b].x, kp[b].y); cc.stroke();
       }
       for (const p of kp) {
-        cc.fillStyle = '#fff';
-        cc.beginPath();
-        cc.arc(p.x, p.y, 3, 0, Math.PI * 2);
-        cc.fill();
+        cc.fillStyle = '#fff'; cc.beginPath(); cc.arc(p.x, p.y, 3, 0, Math.PI*2); cc.fill();
       }
     }
 
-    function drawIrisOverlay(kp) {
+    function drawIrisOverlay(kp, d) {
       const lIris = kp[468], rIris = kp[473];
       if (!lIris || !rIris) return;
+
+      // Draw eye outline landmarks
+      const eyeIdxs = [33,133,159,145,362,263,386,374];
+      for (const idx of eyeIdxs) {
+        if (!kp[idx]) continue;
+        cc.fillStyle = 'rgba(46,125,50,0.5)';
+        cc.beginPath(); cc.arc(kp[idx].x, kp[idx].y, 2, 0, Math.PI*2); cc.fill();
+      }
+
+      // Draw iris circles — green if detecting direction, amber if in deadzone
+      const col = d ? '#2e7d32' : '#f59e0b';
       for (const iris of [lIris, rIris]) {
-        cc.strokeStyle = '#2e7d32';
-        cc.lineWidth = 2;
-        cc.beginPath();
-        cc.arc(iris.x, iris.y, 8, 0, Math.PI * 2);
-        cc.stroke();
-        cc.fillStyle = 'rgba(46,125,50,0.4)';
-        cc.beginPath();
-        cc.arc(iris.x, iris.y, 4, 0, Math.PI * 2);
-        cc.fill();
+        cc.strokeStyle = col; cc.lineWidth = 2;
+        cc.beginPath(); cc.arc(iris.x, iris.y, 9, 0, Math.PI*2); cc.stroke();
+        cc.fillStyle = col.replace(')', ', 0.35)').replace('rgb', 'rgba').replace('#2e7d32','rgba(46,125,50,0.35)').replace('#f59e0b','rgba(245,158,11,0.35)');
+        cc.beginPath(); cc.arc(iris.x, iris.y, 5, 0, Math.PI*2); cc.fill();
       }
     }
+
+    // ── Mode switching ────────────────────────────────────────────────────────
+    const EMOJI = { '1,0':'👉', '-1,0':'👈', '0,1':'👇', '0,-1':'👆' };
+    const INSTRUCTIONS = {
+      hand: `<b>Hand Track:</b><br>Point your index finger to steer.<br><br>☝️ up &nbsp;👇 down &nbsp;👈 left &nbsp;👉 right<br><br>Press <b>R</b> to restart.`,
+      eye:  `<b>Eye Track:</b><br>Look slightly in the direction you want the snake to go.<br><br>Calibrate first for best results.<br><br>Press <b>R</b> to restart.`,
+    };
+
+    async function switchMode(mode) {
+      currentMode = mode;
+      document.getElementById('btnHand').classList.toggle('active', mode === 'hand');
+      document.getElementById('btnEye').classList.toggle('active', mode === 'eye');
+      document.getElementById('instructions').innerHTML = INSTRUCTIONS[mode];
+      document.getElementById('recalibBtn').style.display = (mode === 'eye' && calibrated) ? 'block' : 'none';
+
+      if (mode === 'eye' && !calibrated && faceDetector) {
+        // Show calibration overlay
+        document.getElementById('calibBtn').style.display = 'block';
+        document.getElementById('calibBar').style.width = '0%';
+        document.getElementById('calibStatus').textContent = 'Press Start to calibrate your gaze.';
+        document.getElementById('calibOverlay').classList.add('show');
+      }
+    }
+
+    switchMode('hand');
 
     // ── Game logic ────────────────────────────────────────────────────────────
     function randomFood() {
-      return { x: Math.floor(Math.random() * COLS), y: Math.floor(Math.random() * ROWS) };
+      return { x: Math.floor(Math.random()*COLS), y: Math.floor(Math.random()*ROWS) };
     }
-
     function resetGame() {
-      direction = { x: 1, y: 0 };
-      nextDirection = { x: 1, y: 0 };
-      snake = [{ x: 10, y: 10 }];
-      food = randomFood();
-      score = 0;
-      gameOver = false;
+      direction={x:1,y:0}; nextDirection={x:1,y:0};
+      snake=[{x:10,y:10}]; food=randomFood(); score=0; gameOver=false;
     }
-
     function tick() {
-      direction = { ...nextDirection };
-      const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
-      if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) { gameOver = true; return; }
-      if (snake.some(s => s.x === head.x && s.y === head.y)) { gameOver = true; return; }
+      direction = {...nextDirection};
+      const head = {x: snake[0].x+direction.x, y: snake[0].y+direction.y};
+      if (head.x<0||head.x>=COLS||head.y<0||head.y>=ROWS){gameOver=true;return;}
+      if (snake.some(s=>s.x===head.x&&s.y===head.y)){gameOver=true;return;}
       snake.unshift(head);
-      if (head.x === food.x && head.y === food.y) {
-        score++; if (score > best) best = score; food = randomFood();
-      } else { snake.pop(); }
+      if (head.x===food.x&&head.y===food.y){score++;if(score>best)best=score;food=randomFood();}
+      else snake.pop();
     }
-
     function draw(ts) {
-      if (!gameOver && ts - lastTick > SPEED) { tick(); lastTick = ts; }
-
-      gc.fillStyle = '#fff';
-      gc.fillRect(0, 0, 500, 500);
-
-      // Grid
-      gc.strokeStyle = '#f0f4f0';
-      gc.lineWidth = 1;
-      for (let i = 0; i <= COLS; i++) {
-        gc.beginPath(); gc.moveTo(i * GRID, 0); gc.lineTo(i * GRID, 500); gc.stroke();
-      }
-      for (let j = 0; j <= ROWS; j++) {
-        gc.beginPath(); gc.moveTo(0, j * GRID); gc.lineTo(500, j * GRID); gc.stroke();
-      }
-
-      // Food
-      const pulse = 0.5 + 0.5 * Math.sin(ts / 300);
-      const r = 6 + pulse * 3;
-      gc.fillStyle = `rgba(229, 57, 53, ${0.75 + pulse * 0.25})`;
-      gc.beginPath();
-      gc.arc(food.x * GRID + GRID / 2, food.y * GRID + GRID / 2, r, 0, Math.PI * 2);
-      gc.fill();
-
-      // Snake
-      snake.forEach((seg, i) => {
-        gc.fillStyle = i === 0 ? '#2e7d32' : `hsl(122, 55%, ${35 + i * 1.2}%)`;
-        gc.beginPath();
-        gc.roundRect(seg.x * GRID + 2, seg.y * GRID + 2, GRID - 4, GRID - 4, 5);
-        gc.fill();
+      if (!gameOver && ts-lastTick>SPEED){tick();lastTick=ts;}
+      gc.fillStyle='#fff'; gc.fillRect(0,0,500,500);
+      gc.strokeStyle='#f0f4f0'; gc.lineWidth=1;
+      for(let i=0;i<=COLS;i++){gc.beginPath();gc.moveTo(i*GRID,0);gc.lineTo(i*GRID,500);gc.stroke();}
+      for(let j=0;j<=ROWS;j++){gc.beginPath();gc.moveTo(0,j*GRID);gc.lineTo(500,j*GRID);gc.stroke();}
+      const pulse=0.5+0.5*Math.sin(ts/300);
+      gc.fillStyle=`rgba(229,57,53,${0.75+pulse*0.25})`;
+      gc.beginPath();gc.arc(food.x*GRID+GRID/2,food.y*GRID+GRID/2,6+pulse*3,0,Math.PI*2);gc.fill();
+      snake.forEach((seg,i)=>{
+        gc.fillStyle=i===0?'#2e7d32':`hsl(122,55%,${35+i*1.2}%)`;
+        gc.beginPath();gc.roundRect(seg.x*GRID+2,seg.y*GRID+2,GRID-4,GRID-4,5);gc.fill();
       });
-
-      document.getElementById('scoreDisplay').textContent = `Score: ${score}  |  Best: ${best}`;
-
-      if (gameOver) {
-        gc.fillStyle = 'rgba(255,255,255,0.85)';
-        gc.fillRect(0, 0, 500, 500);
-        gc.fillStyle = '#c62828';
-        gc.font = 'bold 38px Segoe UI';
-        gc.textAlign = 'center';
-        gc.fillText('GAME OVER', 250, 215);
-        gc.fillStyle = '#444';
-        gc.font = '20px Segoe UI';
-        gc.fillText(`Score: ${score}`, 250, 260);
-        gc.fillStyle = '#2e7d32';
-        gc.font = '16px Segoe UI';
-        gc.fillText('Press R to restart', 250, 300);
-        gc.textAlign = 'left';
+      document.getElementById('scoreDisplay').textContent=`Score: ${score}  |  Best: ${best}`;
+      if(gameOver){
+        gc.fillStyle='rgba(255,255,255,0.88)';gc.fillRect(0,0,500,500);
+        gc.fillStyle='#c62828';gc.font='bold 38px Segoe UI';gc.textAlign='center';
+        gc.fillText('GAME OVER',250,215);
+        gc.fillStyle='#444';gc.font='20px Segoe UI';gc.fillText(`Score: ${score}`,250,260);
+        gc.fillStyle='#2e7d32';gc.font='16px Segoe UI';gc.fillText('Press R to restart',250,300);
+        gc.textAlign='left';
       }
-
       requestAnimationFrame(draw);
     }
 
-    // ── Keyboard ──────────────────────────────────────────────────────────────
-    document.addEventListener('keydown', e => {
-      const map = { ArrowUp: {x:0,y:-1}, ArrowDown: {x:0,y:1}, ArrowLeft: {x:-1,y:0}, ArrowRight: {x:1,y:0} };
-      if (e.key === 'r' || e.key === 'R') { resetGame(); return; }
-      const d = map[e.key];
-      if (d && (d.x !== -direction.x || d.y !== -direction.y)) nextDirection = d;
+    document.addEventListener('keydown', e=>{
+      const map={ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1},ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0}};
+      if(e.key==='r'||e.key==='R'){resetGame();return;}
+      const d=map[e.key];
+      if(d&&(d.x!==-direction.x||d.y!==-direction.y)) nextDirection=d;
     });
 
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+    async function setupCamera() {
+      const v=document.createElement('video');
+      v.width=293;v.height=220;
+      const stream=await navigator.mediaDevices.getUserMedia({video:true});
+      v.srcObject=stream;
+      await new Promise(r=>v.onloadedmetadata=r);
+      v.play();return v;
+    }
+
     // ── Boot ──────────────────────────────────────────────────────────────────
-    (async () => {
-      const status = document.getElementById('status');
+    (async()=>{
+      const status=document.getElementById('status');
       try {
-        status.textContent = 'Loading models...';
+        status.textContent='Loading models...';
         [video, handDetector, faceDetector] = await Promise.all([
           setupCamera(),
-          loadHandModel(),
-          loadFaceModel(),
+          handPoseDetection.createDetector(
+            handPoseDetection.SupportedModels.MediaPipeHands,
+            {runtime:'tfjs',modelType:'lite',maxHands:1}
+          ),
+          faceLandmarksDetection.createDetector(
+            faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
+            {runtime:'tfjs',refineLandmarks:true,maxFaces:1}
+          ),
         ]);
-        status.textContent = '✅ Ready — switch modes anytime';
+        status.textContent='✅ Ready — switch modes anytime';
         detectionLoop();
-      } catch (err) {
-        status.textContent = `⚠️ ${err.message || err} — use arrow keys`;
+      } catch(err) {
+        status.textContent=`⚠️ ${err.message||err} — use arrow keys`;
         console.error(err);
       }
       requestAnimationFrame(draw);
