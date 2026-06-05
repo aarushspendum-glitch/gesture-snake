@@ -319,11 +319,11 @@ async function detectionLoop() {
 function buildCalibDots() {
   const layer = document.getElementById('calibDotLayer');
   layer.innerHTML = ''; calibDotEls = [];
-  for (const [px, py] of CALIB_POINTS) {
+  for (const pt of CALIB_POINTS) {
     const d = document.createElement('div');
     d.className = 'calibDot';
-    d.style.left = `${px * 100}%`;
-    d.style.top  = `${py * 100}%`;
+    d.style.left = `${pt.x * 100}%`;
+    d.style.top  = `${pt.y * 100}%`;
     layer.appendChild(d); calibDotEls.push(d);
   }
 }
