@@ -6,205 +6,350 @@
   <title>Gesture Snake</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+
     body {
-      background: #0d0d0d;
-      color: #fff;
-      font-family: 'Segoe UI', sans-serif;
+      background: #f0f4f0;
+      color: #1a1a1a;
+      font-family: 'Segoe UI', system-ui, sans-serif;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       min-height: 100vh;
-      gap: 16px;
+      gap: 14px;
+      padding: 20px;
     }
-    h1 { font-size: 1.6rem; letter-spacing: 2px; color: #00e676; }
+
+    h1 {
+      font-size: 1.8rem;
+      letter-spacing: 3px;
+      color: #2e7d32;
+      font-weight: 800;
+    }
+
     #status {
-      font-size: 0.85rem;
-      color: #aaa;
-      height: 20px;
+      font-size: 0.82rem;
+      color: #555;
+      height: 18px;
     }
+
+    /* Mode tabs */
+    #modeTabs {
+      display: flex;
+      background: #fff;
+      border-radius: 12px;
+      padding: 4px;
+      gap: 4px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.1);
+    }
+
+    .modeBtn {
+      padding: 8px 22px;
+      border: none;
+      border-radius: 9px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: transparent;
+      color: #666;
+    }
+
+    .modeBtn.active {
+      background: #2e7d32;
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(46,125,50,0.3);
+    }
+
+    .modeBtn:not(.active):hover {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+
     #arena {
       display: flex;
       gap: 16px;
       align-items: flex-start;
     }
+
     #gameCanvas {
-      border: 2px solid #222;
-      border-radius: 4px;
+      border: 2px solid #c8e6c9;
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
     }
-    #camCanvas {
-      width: 240px;
-      height: 180px;
-      border: 2px solid #222;
-      border-radius: 4px;
-      transform: scaleX(-1);
-    }
-    #info {
-      width: 240px;
+
+    #sidebar {
+      width: 220px;
       display: flex;
       flex-direction: column;
       gap: 10px;
     }
+
+    #camCanvas {
+      width: 220px;
+      height: 165px;
+      border: 2px solid #c8e6c9;
+      border-radius: 10px;
+      transform: scaleX(-1);
+      background: #e8f5e9;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+
     .card {
-      background: #1a1a1a;
-      border-radius: 8px;
-      padding: 12px;
-      font-size: 0.8rem;
-      color: #ccc;
-      line-height: 1.6;
+      background: #fff;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 0.78rem;
+      color: #444;
+      line-height: 1.7;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+      border: 1px solid #e8f5e9;
     }
-    .card b { color: #00e676; }
+
+    .card b { color: #2e7d32; }
+
     #scoreDisplay {
-      font-size: 1.1rem;
-      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1a1a1a;
     }
+
     #dirDisplay {
-      font-size: 1.4rem;
+      font-size: 1.6rem;
       text-align: center;
-      padding: 8px;
     }
+
+    #instructions { display: block; }
   </style>
 </head>
 <body>
-  <h1>GESTURE SNAKE</h1>
-  <div id="status">Loading hand tracking model...</div>
+
+  <h1>🐍 GESTURE SNAKE</h1>
+
+  <!-- Mode switcher -->
+  <div id="modeTabs">
+    <button class="modeBtn active" id="btnHand" onclick="switchMode('hand')">🖐 Hand Track</button>
+    <button class="modeBtn" id="btnEye" onclick="switchMode('eye')">👁 Eye Track</button>
+  </div>
+
+  <div id="status">Loading model...</div>
 
   <div id="arena">
     <canvas id="gameCanvas" width="500" height="500"></canvas>
-    <div id="info">
-      <canvas id="camCanvas" width="320" height="240"></canvas>
-      <div class="card">
-        <div id="scoreDisplay">Score: 0 &nbsp;|&nbsp; Best: 0</div>
-      </div>
+    <div id="sidebar">
+      <canvas id="camCanvas" width="293" height="220"></canvas>
+      <div class="card"><div id="scoreDisplay">Score: 0 &nbsp;|&nbsp; Best: 0</div></div>
       <div class="card" id="dirDisplay">👆</div>
-      <div class="card">
-        <b>How to play:</b><br>
-        Point your index finger to steer.<br><br>
-        ☝️ up &nbsp; 👇 down<br>
-        👈 left &nbsp; 👉 right<br><br>
-        Press <b>R</b> to restart.
-      </div>
+      <div class="card" id="instructions"></div>
     </div>
   </div>
 
-  <!-- TensorFlow.js + MediaPipe Hands -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@1.0.6/dist/face-landmarks-detection.min.js"></script>
 
   <script>
-    // ── Config ──────────────────────────────────────────────────────────────
-    const GRID = 25;
-    const COLS = 20;
-    const ROWS = 20;
-    const SPEED = 150; // ms per tick
+    // ── Config ───────────────────────────────────────────────────────────────
+    const GRID = 25, COLS = 20, ROWS = 20, SPEED = 150;
 
-    // ── State ────────────────────────────────────────────────────────────────
+    // ── Game state ────────────────────────────────────────────────────────────
     let direction = { x: 1, y: 0 };
     let nextDirection = { x: 1, y: 0 };
     let snake = [{ x: 10, y: 10 }];
     let food = randomFood();
-    let score = 0;
-    let best = 0;
-    let gameOver = false;
-    let lastTick = 0;
+    let score = 0, best = 0, gameOver = false, lastTick = 0;
     let gestureDir = '👆';
 
-    // ── Canvas setup ─────────────────────────────────────────────────────────
+    // ── Canvas ────────────────────────────────────────────────────────────────
     const gameCanvas = document.getElementById('gameCanvas');
     const gc = gameCanvas.getContext('2d');
     const camCanvas = document.getElementById('camCanvas');
     const cc = camCanvas.getContext('2d');
 
-    // ── Hand tracking ────────────────────────────────────────────────────────
-    async function setupCamera() {
-      const video = document.createElement('video');
-      video.width = 320;
-      video.height = 240;
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      video.srcObject = stream;
-      await new Promise(r => video.onloadedmetadata = r);
-      video.play();
-      return video;
-    }
-
-    async function loadModel() {
-      const model = handPoseDetection.SupportedModels.MediaPipeHands;
-      const detector = await handPoseDetection.createDetector(model, {
-        runtime: 'tfjs',
-        modelType: 'lite',
-        maxHands: 1,
-      });
-      return detector;
-    }
-
-    function getDirectionFromHand(keypoints) {
-      const wrist = keypoints[0];
-      const indexTip = keypoints[8];
-      const dx = indexTip.x - wrist.x;
-      const dy = indexTip.y - wrist.y;
-
-      // video is mirrored on display, flip dx for intuitive control
-      const realDx = -dx;
-
-      if (Math.abs(realDx) > Math.abs(dy)) {
-        return realDx > 0 ? { x: 1, y: 0 } : { x: -1, y: 0 };
-      } else {
-        return dy > 0 ? { x: 0, y: 1 } : { x: 0, y: -1 };
-      }
-    }
+    // ── Mode ──────────────────────────────────────────────────────────────────
+    let currentMode = 'hand';
+    let handDetector = null, faceDetector = null;
+    let video = null;
 
     const EMOJI = { '1,0': '👉', '-1,0': '👈', '0,1': '👇', '0,-1': '👆' };
 
-    async function runDetection(detector, video) {
-      const hands = await detector.estimateHands(video);
-      cc.drawImage(video, 0, 0, 320, 240);
+    const INSTRUCTIONS = {
+      hand: `<b>Hand Track:</b><br>Point your index finger to steer.<br><br>☝️ up &nbsp; 👇 down<br>👈 left &nbsp; 👉 right<br><br>Press <b>R</b> to restart.`,
+      eye:  `<b>Eye Track:</b><br>Look in the direction you want<br>the snake to go.<br><br>👀 Look up/down/left/right<br><br>Press <b>R</b> to restart.`
+    };
 
-      if (hands.length > 0) {
-        const kp = hands[0].keypoints;
-        const d = getDirectionFromHand(kp);
+    function switchMode(mode) {
+      currentMode = mode;
+      document.getElementById('btnHand').classList.toggle('active', mode === 'hand');
+      document.getElementById('btnEye').classList.toggle('active', mode === 'eye');
+      document.getElementById('instructions').innerHTML = INSTRUCTIONS[mode];
+    }
 
-        // Don't allow reversing
-        if (d.x !== -direction.x || d.y !== -direction.y) {
-          nextDirection = d;
+    switchMode('hand');
+
+    // ── Camera ────────────────────────────────────────────────────────────────
+    async function setupCamera() {
+      const v = document.createElement('video');
+      v.width = 293; v.height = 220;
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      v.srcObject = stream;
+      await new Promise(r => v.onloadedmetadata = r);
+      v.play();
+      return v;
+    }
+
+    // ── Hand tracking ─────────────────────────────────────────────────────────
+    async function loadHandModel() {
+      return handPoseDetection.createDetector(
+        handPoseDetection.SupportedModels.MediaPipeHands,
+        { runtime: 'tfjs', modelType: 'lite', maxHands: 1 }
+      );
+    }
+
+    function getHandDirection(keypoints) {
+      const wrist    = keypoints[0];
+      const indexTip = keypoints[8];
+      const dx = indexTip.x - wrist.x;
+      const dy = indexTip.y - wrist.y;
+      const realDx = -dx; // mirrored canvas
+      if (Math.abs(realDx) > Math.abs(dy)) {
+        return realDx > 0 ? { x: 1, y: 0 } : { x: -1, y: 0 };
+      }
+      return dy > 0 ? { x: 0, y: 1 } : { x: 0, y: -1 };
+    }
+
+    // ── Eye tracking ──────────────────────────────────────────────────────────
+    async function loadFaceModel() {
+      return faceLandmarksDetection.createDetector(
+        faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
+        { runtime: 'tfjs', refineLandmarks: true, maxFaces: 1 }
+      );
+    }
+
+    // MediaPipe Face Mesh iris indices (with refineLandmarks: true)
+    // Left iris center: 468, Right iris center: 473
+    // Left eye corners: 33 (outer), 133 (inner)
+    // Right eye corners: 362 (outer), 263 (inner)
+    function getEyeDirection(keypoints) {
+      const lIris  = keypoints[468];
+      const rIris  = keypoints[473];
+      const lOuter = keypoints[33];
+      const lInner = keypoints[133];
+      const rOuter = keypoints[362];
+      const rInner = keypoints[263];
+
+      if (!lIris || !rIris) return null;
+
+      // Normalize iris position within each eye horizontally
+      const lEyeW = Math.abs(lInner.x - lOuter.x);
+      const rEyeW = Math.abs(rInner.x - rOuter.x);
+      const lGazeX = (lIris.x - lOuter.x) / (lEyeW || 1);
+      const rGazeX = (rIris.x - rOuter.x) / (rEyeW || 1);
+      const gazeX = (lGazeX + rGazeX) / 2; // 0=look left, 1=look right (mirrored)
+
+      // Vertical: use both irises relative to eye top/bottom
+      const lTop    = keypoints[159]; const lBot = keypoints[145];
+      const rTop    = keypoints[386]; const rBot = keypoints[374];
+      const lEyeH   = Math.abs(lBot.y - lTop.y);
+      const rEyeH   = Math.abs(rBot.y - rTop.y);
+      const lGazeY  = (lIris.y - lTop.y) / (lEyeH || 1);
+      const rGazeY  = (rIris.y - rTop.y) / (rEyeH || 1);
+      const gazeY   = (lGazeY + rGazeY) / 2; // 0=look up, 1=look down
+
+      // Deadzone in center to avoid accidental triggers
+      const H_THRESH = 0.15; // horizontal sensitivity
+      const V_THRESH = 0.18; // vertical sensitivity
+
+      const hOffset = gazeX - 0.5; // negative = looking left, positive = looking right
+      const vOffset = gazeY - 0.5; // negative = looking up, positive = looking down
+
+      if (Math.abs(hOffset) > Math.abs(vOffset)) {
+        if (hOffset > H_THRESH)  return { x: -1, y: 0 }; // mirrored: gaze right = snake left... actually let's keep natural
+        if (hOffset < -H_THRESH) return { x: 1, y: 0 };
+      } else {
+        if (vOffset > V_THRESH)  return { x: 0, y: 1 };
+        if (vOffset < -V_THRESH) return { x: 0, y: -1 };
+      }
+      return null; // in deadzone — keep current direction
+    }
+
+    // ── Detection loop ────────────────────────────────────────────────────────
+    async function detectionLoop() {
+      cc.drawImage(video, 0, 0, 293, 220);
+
+      let d = null;
+
+      if (currentMode === 'hand' && handDetector) {
+        const hands = await handDetector.estimateHands(video);
+        if (hands.length > 0) {
+          const kp = hands[0].keypoints;
+          d = getHandDirection(kp);
+          drawHandSkeleton(kp);
         }
-
-        gestureDir = EMOJI[`${d.x},${d.y}`] || '👆';
-
-        // Draw skeleton
-        cc.strokeStyle = '#00e676';
-        cc.lineWidth = 2;
-        const connections = [
-          [0,1],[1,2],[2,3],[3,4],
-          [0,5],[5,6],[6,7],[7,8],
-          [0,9],[9,10],[10,11],[11,12],
-          [0,13],[13,14],[14,15],[15,16],
-          [0,17],[17,18],[18,19],[19,20],
-          [5,9],[9,13],[13,17],
-        ];
-        for (const [a, b] of connections) {
-          cc.beginPath();
-          cc.moveTo(kp[a].x, kp[a].y);
-          cc.lineTo(kp[b].x, kp[b].y);
-          cc.stroke();
-        }
-        for (const p of kp) {
-          cc.fillStyle = '#fff';
-          cc.beginPath();
-          cc.arc(p.x, p.y, 3, 0, Math.PI * 2);
-          cc.fill();
+      } else if (currentMode === 'eye' && faceDetector) {
+        const faces = await faceDetector.estimateFaces(video);
+        if (faces.length > 0) {
+          const kp = faces[0].keypoints;
+          d = getEyeDirection(kp);
+          drawIrisOverlay(kp);
         }
       }
 
+      if (d && (d.x !== -direction.x || d.y !== -direction.y)) {
+        nextDirection = d;
+      }
+      if (d) gestureDir = EMOJI[`${d.x},${d.y}`] || gestureDir;
       document.getElementById('dirDisplay').textContent = gestureDir;
-      requestAnimationFrame(() => runDetection(detector, video));
+
+      requestAnimationFrame(detectionLoop);
     }
 
-    // ── Game logic ───────────────────────────────────────────────────────────
+    // ── Drawing overlays ──────────────────────────────────────────────────────
+    function drawHandSkeleton(kp) {
+      const connections = [
+        [0,1],[1,2],[2,3],[3,4],
+        [0,5],[5,6],[6,7],[7,8],
+        [0,9],[9,10],[10,11],[11,12],
+        [0,13],[13,14],[14,15],[15,16],
+        [0,17],[17,18],[18,19],[19,20],
+        [5,9],[9,13],[13,17],
+      ];
+      cc.strokeStyle = '#2e7d32';
+      cc.lineWidth = 2;
+      for (const [a, b] of connections) {
+        cc.beginPath();
+        cc.moveTo(kp[a].x, kp[a].y);
+        cc.lineTo(kp[b].x, kp[b].y);
+        cc.stroke();
+      }
+      for (const p of kp) {
+        cc.fillStyle = '#fff';
+        cc.beginPath();
+        cc.arc(p.x, p.y, 3, 0, Math.PI * 2);
+        cc.fill();
+      }
+    }
+
+    function drawIrisOverlay(kp) {
+      const lIris = kp[468], rIris = kp[473];
+      if (!lIris || !rIris) return;
+      for (const iris of [lIris, rIris]) {
+        cc.strokeStyle = '#2e7d32';
+        cc.lineWidth = 2;
+        cc.beginPath();
+        cc.arc(iris.x, iris.y, 8, 0, Math.PI * 2);
+        cc.stroke();
+        cc.fillStyle = 'rgba(46,125,50,0.4)';
+        cc.beginPath();
+        cc.arc(iris.x, iris.y, 4, 0, Math.PI * 2);
+        cc.fill();
+      }
+    }
+
+    // ── Game logic ────────────────────────────────────────────────────────────
     function randomFood() {
-      return {
-        x: Math.floor(Math.random() * COLS),
-        y: Math.floor(Math.random() * ROWS),
-      };
+      return { x: Math.floor(Math.random() * COLS), y: Math.floor(Math.random() * ROWS) };
     }
 
     function resetGame() {
@@ -218,41 +363,24 @@
 
     function tick() {
       direction = { ...nextDirection };
-      const head = {
-        x: snake[0].x + direction.x,
-        y: snake[0].y + direction.y,
-      };
-
-      if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) {
-        gameOver = true; return;
-      }
-      if (snake.some(s => s.x === head.x && s.y === head.y)) {
-        gameOver = true; return;
-      }
-
+      const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
+      if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) { gameOver = true; return; }
+      if (snake.some(s => s.x === head.x && s.y === head.y)) { gameOver = true; return; }
       snake.unshift(head);
       if (head.x === food.x && head.y === food.y) {
-        score++;
-        if (score > best) best = score;
-        food = randomFood();
-      } else {
-        snake.pop();
-      }
+        score++; if (score > best) best = score; food = randomFood();
+      } else { snake.pop(); }
     }
 
     function draw(ts) {
-      if (!gameOver && ts - lastTick > SPEED) {
-        tick();
-        lastTick = ts;
-      }
+      if (!gameOver && ts - lastTick > SPEED) { tick(); lastTick = ts; }
 
-      // Background
-      gc.fillStyle = '#0d0d0d';
+      gc.fillStyle = '#fff';
       gc.fillRect(0, 0, 500, 500);
 
-      // Grid lines (subtle)
-      gc.strokeStyle = '#161616';
-      gc.lineWidth = 0.5;
+      // Grid
+      gc.strokeStyle = '#f0f4f0';
+      gc.lineWidth = 1;
       for (let i = 0; i <= COLS; i++) {
         gc.beginPath(); gc.moveTo(i * GRID, 0); gc.lineTo(i * GRID, 500); gc.stroke();
       }
@@ -260,70 +388,65 @@
         gc.beginPath(); gc.moveTo(0, j * GRID); gc.lineTo(500, j * GRID); gc.stroke();
       }
 
-      // Food (pulsing)
+      // Food
       const pulse = 0.5 + 0.5 * Math.sin(ts / 300);
       const r = 6 + pulse * 3;
-      gc.fillStyle = `rgba(255, 80, 80, ${0.7 + pulse * 0.3})`;
+      gc.fillStyle = `rgba(229, 57, 53, ${0.75 + pulse * 0.25})`;
       gc.beginPath();
       gc.arc(food.x * GRID + GRID / 2, food.y * GRID + GRID / 2, r, 0, Math.PI * 2);
       gc.fill();
 
       // Snake
       snake.forEach((seg, i) => {
-        const green = Math.floor(180 + (i === 0 ? 75 : 0));
-        gc.fillStyle = i === 0 ? '#00e676' : `rgb(0, ${green - i * 3}, ${60 + i})`;
+        gc.fillStyle = i === 0 ? '#2e7d32' : `hsl(122, 55%, ${35 + i * 1.2}%)`;
         gc.beginPath();
-        gc.roundRect(seg.x * GRID + 2, seg.y * GRID + 2, GRID - 4, GRID - 4, 4);
+        gc.roundRect(seg.x * GRID + 2, seg.y * GRID + 2, GRID - 4, GRID - 4, 5);
         gc.fill();
       });
 
-      // Score
-      document.getElementById('scoreDisplay').textContent =
-        `Score: ${score}  |  Best: ${best}`;
+      document.getElementById('scoreDisplay').textContent = `Score: ${score}  |  Best: ${best}`;
 
-      // Game over overlay
       if (gameOver) {
-        gc.fillStyle = 'rgba(0,0,0,0.6)';
+        gc.fillStyle = 'rgba(255,255,255,0.85)';
         gc.fillRect(0, 0, 500, 500);
-        gc.fillStyle = '#ff5252';
-        gc.font = 'bold 36px Segoe UI';
+        gc.fillStyle = '#c62828';
+        gc.font = 'bold 38px Segoe UI';
         gc.textAlign = 'center';
-        gc.fillText('GAME OVER', 250, 220);
-        gc.fillStyle = '#aaa';
-        gc.font = '18px Segoe UI';
-        gc.fillText(`Score: ${score}`, 250, 265);
-        gc.fillStyle = '#00e676';
-        gc.fillText('Press R to restart', 250, 310);
+        gc.fillText('GAME OVER', 250, 215);
+        gc.fillStyle = '#444';
+        gc.font = '20px Segoe UI';
+        gc.fillText(`Score: ${score}`, 250, 260);
+        gc.fillStyle = '#2e7d32';
+        gc.font = '16px Segoe UI';
+        gc.fillText('Press R to restart', 250, 300);
         gc.textAlign = 'left';
       }
 
       requestAnimationFrame(draw);
     }
 
-    // ── Keyboard fallback ────────────────────────────────────────────────────
+    // ── Keyboard ──────────────────────────────────────────────────────────────
     document.addEventListener('keydown', e => {
-      const map = {
-        ArrowUp:    { x: 0, y: -1 },
-        ArrowDown:  { x: 0, y: 1 },
-        ArrowLeft:  { x: -1, y: 0 },
-        ArrowRight: { x: 1, y: 0 },
-      };
+      const map = { ArrowUp: {x:0,y:-1}, ArrowDown: {x:0,y:1}, ArrowLeft: {x:-1,y:0}, ArrowRight: {x:1,y:0} };
       if (e.key === 'r' || e.key === 'R') { resetGame(); return; }
       const d = map[e.key];
-      if (d && (d.x !== -direction.x || d.y !== -direction.y)) {
-        nextDirection = d;
-      }
+      if (d && (d.x !== -direction.x || d.y !== -direction.y)) nextDirection = d;
     });
 
-    // ── Boot ─────────────────────────────────────────────────────────────────
+    // ── Boot ──────────────────────────────────────────────────────────────────
     (async () => {
       const status = document.getElementById('status');
       try {
-        const [video, detector] = await Promise.all([setupCamera(), loadModel()]);
-        status.textContent = '✅ Hand tracking active — point your index finger to steer';
-        runDetection(detector, video);
+        status.textContent = 'Loading models...';
+        [video, handDetector, faceDetector] = await Promise.all([
+          setupCamera(),
+          loadHandModel(),
+          loadFaceModel(),
+        ]);
+        status.textContent = '✅ Ready — switch modes anytime';
+        detectionLoop();
       } catch (err) {
-        status.textContent = `⚠️ ${err.message || err} — use arrow keys to play`;
+        status.textContent = `⚠️ ${err.message || err} — use arrow keys`;
         console.error(err);
       }
       requestAnimationFrame(draw);
