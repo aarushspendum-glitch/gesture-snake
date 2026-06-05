@@ -145,17 +145,16 @@ const INSTRUCTIONS = {
   eye:  `<b>Eye Track:</b><br>Look slightly toward where you want the snake to go.<br><br>Calibrate first for best results.<br><br>Press <b>R</b> to restart.`,
 };
 
-// Calibration points on the game canvas [xPct, yPct]
+// 5-point calibration: center then 4 directions
+// Labels match calib anchor keys below
 const CALIB_POINTS = [
-  [0.5,  0.5 ],
-  [0.5,  0.08], [0.5,  0.92],
-  [0.08, 0.5 ], [0.92, 0.5 ],
-  [0.08, 0.08], [0.92, 0.08],
-  [0.08, 0.92], [0.92, 0.92],
-  [0.5,  0.3 ], [0.5,  0.7 ],
-  [0.3,  0.5 ], [0.7,  0.5 ],
+  { x: 0.5,  y: 0.5,  label: 'center', hint: 'Look straight at the center dot' },
+  { x: 0.5,  y: 0.06, label: 'up',     hint: 'Look UP at the dot'              },
+  { x: 0.5,  y: 0.94, label: 'down',   hint: 'Look DOWN at the dot'            },
+  { x: 0.06, y: 0.5,  label: 'left',   hint: 'Look LEFT at the dot'            },
+  { x: 0.94, y: 0.5,  label: 'right',  hint: 'Look RIGHT at the dot'           },
 ];
-const CALIB_HOLD_MS = 1500;
+const CALIB_HOLD_MS = 2000; // 2s per point — more samples, more accurate
 
 // ── Game state ────────────────────────────────────────────────────────────────
 let direction = {x:1,y:0}, nextDirection = {x:1,y:0};
@@ -175,19 +174,19 @@ let handDetector = null, faceDetector = null, video = null;
 let detecting = false;  // prevents concurrent detection calls
 
 // ── Gaze smoothing ────────────────────────────────────────────────────────────
-// Rolling buffer of last N raw gaze readings — average before deciding direction
-const GAZE_SMOOTH = 8;
+const GAZE_SMOOTH = 5;
 const gazeBuffer = [];
-
-// Direction confirmation — require same direction N frames before committing
-const DIR_CONFIRM = 3;
-let dirVotes = {dir: null, count: 0};
 
 // ── Calibration state ─────────────────────────────────────────────────────────
 let isCalibrating = false, calibrated = false;
-let gazeMinX = 0.35, gazeMaxX = 0.65;
-let gazeMinY = 0.35, gazeMaxY = 0.65;
 let calibDotEls = [];
+
+// Anchor gaze values recorded during calibration
+// Each is an {x, y} average of raw gaze readings at that position
+let anchors = { center: null, up: null, down: null, left: null, right: null };
+
+// Fallback thresholds used before calibration
+let fallback = { threshX: 0.08, threshY: 0.06 };
 
 // ── Eye gaze extraction ───────────────────────────────────────────────────────
 function extractRawGaze(kp) {
@@ -233,35 +232,43 @@ function getEyeDirection(kp) {
   const gaze = getSmoothedGaze(kp);
   if (!gaze) return null;
 
-  const rangeX = Math.max(gazeMaxX - gazeMinX, 0.05);
-  const rangeY = Math.max(gazeMaxY - gazeMinY, 0.05);
+  if (calibrated && anchors.center) {
+    // Anchor-based detection:
+    // Measure how far current gaze is from center toward each direction anchor.
+    // Score = dot product of (gaze - center) with (anchor - center).
+    // Whichever direction scores highest wins, if it clears the threshold.
+    const c = anchors.center;
+    const dx = gaze.x - c.x;
+    const dy = gaze.y - c.y;
 
-  // Normalize to [-1, 1]: 0 = looking at center of calibrated range
-  const nx = ((gaze.x - gazeMinX) / rangeX) * 2 - 1;
-  const ny = ((gaze.y - gazeMinY) / rangeY) * 2 - 1;
+    const scores = {};
+    for (const dir of ['up','down','left','right']) {
+      if (!anchors[dir]) continue;
+      const ax = anchors[dir].x - c.x;
+      const ay = anchors[dir].y - c.y;
+      const len = Math.sqrt(ax*ax + ay*ay) || 1;
+      // Normalized dot product — 1.0 means perfectly aligned with that anchor
+      scores[dir] = (dx*ax + dy*ay) / (len * len);
+    }
 
-  const DEAD_X = 0.30;
-  const DEAD_Y = 0.22;
+    // Find best scoring direction
+    const best = Object.entries(scores).sort((a,b) => b[1]-a[1])[0];
+    if (!best || best[1] < 0.35) return null; // 0.35 = must be 35% of the way to the anchor
 
-  let candidate = null;
-  if (Math.abs(nx) > Math.abs(ny)) {
-    if (nx >  DEAD_X) candidate = { x: -1, y: 0 };
-    if (nx < -DEAD_X) candidate = { x:  1, y: 0 };
+    const map = { up:{x:0,y:-1}, down:{x:0,y:1}, left:{x:1,y:0}, right:{x:-1,y:0} };
+    return map[best[0]] || null;
+
   } else {
-    if (ny >  DEAD_Y) candidate = { x: 0, y:  1 };
-    if (ny < -DEAD_Y) candidate = { x: 0, y: -1 };
+    // Pre-calibration fallback: simple offset from raw center (0.5, 0.0)
+    const dx = -(gaze.x - 0.5); // mirrored
+    const dy = gaze.y;           // already centered around ~0
+    if (Math.abs(dx) > Math.abs(dy)) {
+      if (Math.abs(dx) > fallback.threshX) return dx > 0 ? {x:1,y:0} : {x:-1,y:0};
+    } else {
+      if (Math.abs(dy) > fallback.threshY) return dy > 0 ? {x:0,y:1} : {x:0,y:-1};
+    }
+    return null;
   }
-
-  // Confirmation: require same direction DIR_CONFIRM frames in a row
-  const key = candidate ? `${candidate.x},${candidate.y}` : null;
-  const prevKey = dirVotes.dir ? `${dirVotes.dir.x},${dirVotes.dir.y}` : null;
-  if (key === prevKey) {
-    dirVotes.count++;
-  } else {
-    dirVotes.dir = candidate;
-    dirVotes.count = 1;
-  }
-  return (dirVotes.count >= DIR_CONFIRM) ? candidate : null;
 }
 
 // ── Hand tracking ─────────────────────────────────────────────────────────────
@@ -324,27 +331,31 @@ function buildCalibDots() {
 async function startCalibration() {
   if (!faceDetector) return;
   isCalibrating = true;
-  gazeBuffer.length = 0; // clear smoothing buffer
+  calibrated = false;
+  anchors = { center:null, up:null, down:null, left:null, right:null };
+  gazeBuffer.length = 0;
   document.getElementById('calibBtn').style.display = 'none';
   document.getElementById('calibOverlay').classList.add('show');
   buildCalibDots();
 
-  const allSamples = Array.from({length: CALIB_POINTS.length}, () => []);
+  const allSamples = CALIB_POINTS.map(() => []);
 
   for (let i = 0; i < CALIB_POINTS.length; i++) {
+    const pt = CALIB_POINTS[i];
     calibDotEls.forEach((d, j) => {
       d.className = 'calibDot' + (j < i ? ' done' : j === i ? ' active' : '');
     });
     document.getElementById('calibStatus').textContent =
-      `Look at the dot (${i + 1} / ${CALIB_POINTS.length})`;
+      `${pt.hint} (${i + 1} / ${CALIB_POINTS.length})`;
+
+    // Brief pause so user can move eyes to the dot before sampling
+    await sleep(400);
 
     const start = performance.now();
     while (performance.now() - start < CALIB_HOLD_MS) {
       const elapsed = performance.now() - start;
       document.getElementById('calibBar').style.width =
         `${((i + elapsed / CALIB_HOLD_MS) / CALIB_POINTS.length) * 100}%`;
-
-      // Sample directly — no conflict since detectionLoop skips eye mode during calibration
       try {
         const faces = await faceDetector.estimateFaces(video);
         if (faces.length > 0) {
@@ -352,7 +363,7 @@ async function startCalibration() {
           if (raw) allSamples[i].push(raw);
         }
       } catch(e) {}
-      await sleep(50);
+      await sleep(40);
     }
     calibDotEls[i].className = 'calibDot done';
   }
@@ -370,33 +381,29 @@ async function startCalibration() {
   document.getElementById('calibOverlay').classList.remove('show');
 }
 
+function trimmedMean(pts) {
+  if (pts.length < 3) return null;
+  const xs = pts.map(p => p.x).sort((a,b) => a-b);
+  const ys = pts.map(p => p.y).sort((a,b) => a-b);
+  const t = Math.max(1, Math.floor(pts.length * 0.2));
+  const tx = xs.slice(t, xs.length - t);
+  const ty = ys.slice(t, ys.length - t);
+  return {
+    x: tx.reduce((s,v)=>s+v,0) / tx.length,
+    y: ty.reduce((s,v)=>s+v,0) / ty.length,
+  };
+}
+
 function applyCalibration(samples) {
-  const avgs = samples.map(pts => {
-    if (pts.length < 3) return null;
-    // Trim outliers: discard top/bottom 20% before averaging
-    const xs = pts.map(p => p.x).sort((a,b) => a-b);
-    const ys = pts.map(p => p.y).sort((a,b) => a-b);
-    const trim = Math.floor(pts.length * 0.2);
-    const trimX = xs.slice(trim, xs.length - trim);
-    const trimY = ys.slice(trim, ys.length - trim);
-    return {
-      x: trimX.reduce((s,v) => s+v, 0) / trimX.length,
-      y: trimY.reduce((s,v) => s+v, 0) / trimY.length,
-    };
-  }).filter(Boolean);
+  // Map each sample set to its anchor label
+  CALIB_POINTS.forEach((pt, i) => {
+    const avg = trimmedMean(samples[i]);
+    if (avg) anchors[pt.label] = avg;
+  });
 
-  if (avgs.length < 4) return;
+  if (!anchors.center) return;
 
-  gazeMinX = Math.min(...avgs.map(p => p.x));
-  gazeMaxX = Math.max(...avgs.map(p => p.x));
-  gazeMinY = Math.min(...avgs.map(p => p.y));
-  gazeMaxY = Math.max(...avgs.map(p => p.y));
-
-  // Expand range slightly so you don't need to hit the exact extreme to trigger
-  const padX = (gazeMaxX - gazeMinX) * 0.15;
-  const padY = (gazeMaxY - gazeMinY) * 0.15;
-  gazeMinX -= padX; gazeMaxX += padX;
-  gazeMinY -= padY; gazeMaxY += padY;
+  console.log('Calibration anchors:', JSON.stringify(anchors));
 }
 
 // ── Drawing overlays ──────────────────────────────────────────────────────────
