@@ -32,7 +32,6 @@
     .modeBtn.active { background: #2e7d32; color: #fff; box-shadow: 0 2px 8px rgba(46,125,50,0.3); }
     .modeBtn:not(.active):hover { background: #e8f5e9; color: #2e7d32; }
     #arena { display: flex; gap: 16px; align-items: flex-start; }
-    #gameWrap { position: relative; width: 500px; height: 500px; }
     #gameCanvas {
       border: 2px solid #c8e6c9; border-radius: 10px;
       background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,0.08);
@@ -52,51 +51,6 @@
     .card b { color: #2e7d32; }
     #scoreDisplay { font-size: 1rem; font-weight: 700; color: #1a1a1a; }
     #dirDisplay { font-size: 1.6rem; text-align: center; }
-
-    /* Calibration overlay — sits on top of game canvas */
-    #calibOverlay {
-      display: none; position: absolute; inset: 0;
-      background: rgba(255,255,255,0.93); border-radius: 10px;
-      z-index: 10; flex-direction: column;
-      align-items: center; justify-content: flex-end;
-      padding-bottom: 22px; gap: 10px;
-    }
-    #calibOverlay.show { display: flex; }
-    #calibDotLayer { position: absolute; inset: 0; pointer-events: none; }
-    .calibDot {
-      position: absolute; width: 24px; height: 24px; border-radius: 50%;
-      background: #c8e6c9; border: 3px solid #a5d6a7;
-      transform: translate(-50%, -50%); transition: background 0.25s, transform 0.25s;
-    }
-    .calibDot.active {
-      background: #2e7d32; border-color: #1b5e20;
-      transform: translate(-50%, -50%) scale(1.4);
-      box-shadow: 0 0 0 6px rgba(46,125,50,0.2);
-    }
-    .calibDot.done { background: #81c784; border-color: #4caf50; }
-    #calibProgress {
-      width: 380px; height: 7px; background: #e8f5e9;
-      border-radius: 4px; overflow: hidden;
-    }
-    #calibBar {
-      height: 100%; background: #2e7d32; border-radius: 4px;
-      transition: width 0.08s linear; width: 0%;
-    }
-    #calibTitle { font-size: 1.1rem; font-weight: 700; color: #2e7d32; }
-    #calibSub { font-size: 0.78rem; color: #555; text-align: center; max-width: 340px; }
-    #calibStatus { font-size: 0.8rem; color: #444; font-weight: 600; }
-    #calibBtn {
-      padding: 10px 28px; background: #2e7d32; color: #fff;
-      border: none; border-radius: 10px; font-size: 0.95rem;
-      font-weight: 700; cursor: pointer; box-shadow: 0 2px 8px rgba(46,125,50,0.3);
-    }
-    #calibBtn:hover { background: #1b5e20; }
-    #recalibBtn {
-      padding: 6px 16px; background: transparent; color: #2e7d32;
-      border: 1.5px solid #2e7d32; border-radius: 8px;
-      font-size: 0.78rem; font-weight: 600; cursor: pointer;
-    }
-    #recalibBtn:hover { background: #e8f5e9; }
   </style>
 </head>
 <body>
@@ -105,30 +59,18 @@
 
 <div id="modeTabs">
   <button class="modeBtn active" id="btnHand" onclick="switchMode('hand')">🖐 Hand Track</button>
-  <button class="modeBtn"        id="btnEye"  onclick="switchMode('eye')">👁 Eye Track</button>
+  <button class="modeBtn"        id="btnHead" onclick="switchMode('head')">🙂 Head Track</button>
 </div>
 
 <div id="status">Loading models...</div>
 
 <div id="arena">
-  <div id="gameWrap">
-    <canvas id="gameCanvas" width="500" height="500"></canvas>
-    <div id="calibOverlay">
-      <div id="calibDotLayer"></div>
-      <div id="calibTitle">👁 Eye Calibration</div>
-      <div id="calibSub">Keep your head still. Look at each dot as it lights up. The dots are on the game board so your gaze calibrates exactly where you'll play.</div>
-      <div id="calibProgress"><div id="calibBar"></div></div>
-      <div id="calibStatus"></div>
-      <button id="calibBtn" onclick="startCalibration()">Start Calibration</button>
-    </div>
-  </div>
-
+  <canvas id="gameCanvas" width="500" height="500"></canvas>
   <div id="sidebar">
     <canvas id="camCanvas" width="293" height="220"></canvas>
     <div class="card"><div id="scoreDisplay">Score: 0 &nbsp;|&nbsp; Best: 0</div></div>
     <div class="card" id="dirDisplay">👆</div>
     <div class="card" id="instructions"></div>
-    <button id="recalibBtn" style="display:none" onclick="startCalibration()">🔄 Recalibrate Eyes</button>
   </div>
 </div>
 
@@ -137,26 +79,15 @@
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@1.0.6/dist/face-landmarks-detection.min.js"></script>
 
 <script>
-// ── Constants ────────────────────────────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
 const GRID = 25, COLS = 20, ROWS = 20, SPEED = 150;
 const EMOJI = { '1,0':'👉', '-1,0':'👈', '0,1':'👇', '0,-1':'👆' };
 const INSTRUCTIONS = {
-  hand: `<b>Hand Track:</b><br>Point your index finger to steer.<br><br>☝️ up &nbsp;👇 down &nbsp;👈 left &nbsp;👉 right<br><br>Press <b>R</b> to restart.`,
-  eye:  `<b>Eye Track:</b><br>Look slightly toward where you want the snake to go.<br><br>Calibrate first for best results.<br><br>Press <b>R</b> to restart.`,
+  hand: `<b>Hand Track:</b><br>Point your index finger to steer.<br><br>☝️ up &nbsp;👇 down<br>👈 left &nbsp;👉 right<br><br>Press <b>R</b> to restart.`,
+  head: `<b>Head Track:</b><br>Tilt your head to steer the snake.<br><br>Tilt up/down/left/right.<br>Small movements work fine.<br><br>Press <b>R</b> to restart.`,
 };
 
-// 5-point calibration: center then 4 directions
-// Labels match calib anchor keys below
-const CALIB_POINTS = [
-  { x: 0.5,  y: 0.5,  label: 'center', hint: 'Look straight at the center dot' },
-  { x: 0.5,  y: 0.06, label: 'up',     hint: 'Look UP at the dot'              },
-  { x: 0.5,  y: 0.94, label: 'down',   hint: 'Look DOWN at the dot'            },
-  { x: 0.06, y: 0.5,  label: 'left',   hint: 'Look LEFT at the dot'            },
-  { x: 0.94, y: 0.5,  label: 'right',  hint: 'Look RIGHT at the dot'           },
-];
-const CALIB_HOLD_MS = 2000; // 2s per point — more samples, more accurate
-
-// ── Game state ────────────────────────────────────────────────────────────────
+// ── Game state ─────────────────────────────────────────────────────────────────
 let direction = {x:1,y:0}, nextDirection = {x:1,y:0};
 let snake = [{x:10,y:10}], food = randomFood();
 let score = 0, best = 0, gameOver = false, lastTick = 0;
@@ -171,121 +102,120 @@ const cc = camCanvas.getContext('2d');
 // ── Detectors ─────────────────────────────────────────────────────────────────
 let currentMode = 'hand';
 let handDetector = null, faceDetector = null, video = null;
-let detecting = false;  // prevents concurrent detection calls
+let detecting = false;
 
-// ── Gaze smoothing ────────────────────────────────────────────────────────────
-const GAZE_SMOOTH = 5;
-const gazeBuffer = [];
+// ── Head tracking ─────────────────────────────────────────────────────────────
+// We track the nose tip (landmark 1) relative to the face's own bounding box.
+// This makes it head-rotation based (tilt), not position-in-frame based,
+// so it works even if you're not perfectly centered in the camera.
 
-// ── Calibration state ─────────────────────────────────────────────────────────
-let isCalibrating = false, calibrated = false;
-let calibDotEls = [];
+// Smoothing buffer for nose position
+const HEAD_SMOOTH = 6;
+const noseBuffer = [];
 
-// Anchor gaze values recorded during calibration
-// Each is an {x, y} average of raw gaze readings at that position
-let anchors = { center: null, up: null, down: null, left: null, right: null };
+// Neutral nose position — set on first few frames, updated slowly
+let noseNeutral = null;
+const NEUTRAL_LERP = 0.015; // how fast neutral drifts back toward center
 
-// Fallback thresholds used before calibration
-let fallback = { threshX: 0.08, threshY: 0.06 };
+// Sensitivity: how far from neutral (as fraction of face width) to trigger
+const HEAD_THRESH_X = 0.12;
+const HEAD_THRESH_Y = 0.10;
 
-// ── Eye gaze extraction ───────────────────────────────────────────────────────
-function extractRawGaze(kp) {
-  const lIris = kp[468], rIris = kp[473];
-  if (!lIris || !rIris) return null;
+function getHeadDirection(kp) {
+  // Nose tip = landmark 1
+  // Face width reference: distance between left cheek (234) and right cheek (454)
+  const nose    = kp[1];
+  const lCheek  = kp[234];
+  const rCheek  = kp[454];
+  const chin    = kp[152];
+  const forehead = kp[10];
 
-  // Horizontal: iris position relative to eye corners (bone-fixed, brow-independent)
-  const lOuter = kp[33],  lInner = kp[133];
-  const rOuter = kp[362], rInner = kp[263];
-  const lEyeW = Math.abs(lInner.x - lOuter.x) || 1;
-  const rEyeW = Math.abs(rInner.x - rOuter.x) || 1;
-  const lGazeX = (lIris.x - lOuter.x) / lEyeW;
-  const rGazeX = (rIris.x - rOuter.x) / rEyeW;
+  if (!nose || !lCheek || !rCheek) return null;
 
-  // Vertical: iris offset from eye corner center Y, normalized by eye width
-  // Using corner Y (not eyelid Y) means brow raises don't shift the reference.
-  // Dividing by eyeW*0.35 scales up the small vertical range to match horizontal.
-  const lCornerCY = (lOuter.y + lInner.y) / 2;
-  const rCornerCY = (rOuter.y + rInner.y) / 2;
-  const lGazeY = (lIris.y - lCornerCY) / (lEyeW * 0.35);
-  const rGazeY = (rIris.y - rCornerCY) / (rEyeW * 0.35);
+  const faceW = Math.abs(rCheek.x - lCheek.x) || 1;
+  const faceH = Math.abs(chin.y  - forehead.y) || 1;
 
-  return { x: (lGazeX + rGazeX) / 2, y: (lGazeY + rGazeY) / 2 };
-}
+  // Nose position normalized to face size — removes distance-from-camera effect
+  const nx = (nose.x - (lCheek.x + rCheek.x) / 2) / faceW;
+  const ny = (nose.y - (forehead.y + chin.y)   / 2) / faceH;
 
-function getSmoothedGaze(kp) {
-  const raw = extractRawGaze(kp);
-  if (!raw) return null;
+  // Smooth
+  noseBuffer.push({x: nx, y: ny});
+  if (noseBuffer.length > HEAD_SMOOTH) noseBuffer.shift();
+  const sx = noseBuffer.reduce((s,p) => s+p.x, 0) / noseBuffer.length;
+  const sy = noseBuffer.reduce((s,p) => s+p.y, 0) / noseBuffer.length;
 
-  gazeBuffer.push(raw);
-  if (gazeBuffer.length > GAZE_SMOOTH) gazeBuffer.shift();
+  // Initialize neutral on first reading
+  if (!noseNeutral) noseNeutral = {x: sx, y: sy};
 
-  // Weighted average — recent frames count more
-  let wx = 0, wy = 0, wSum = 0;
-  gazeBuffer.forEach((g, i) => {
-    const w = i + 1; // weight = position index (newest = highest)
-    wx += g.x * w; wy += g.y * w; wSum += w;
-  });
-  return { x: wx / wSum, y: wy / wSum };
-}
+  // Slowly drift neutral toward current position when no big movement
+  // This auto-corrects for people who naturally hold their head off-center
+  const dx = sx - noseNeutral.x;
+  const dy = sy - noseNeutral.y;
+  if (Math.abs(dx) < HEAD_THRESH_X * 0.5 && Math.abs(dy) < HEAD_THRESH_Y * 0.5) {
+    noseNeutral.x += dx * NEUTRAL_LERP;
+    noseNeutral.y += dy * NEUTRAL_LERP;
+  }
 
-function getEyeDirection(kp) {
-  const gaze = getSmoothedGaze(kp);
-  if (!gaze) return null;
+  // Offset from neutral
+  const ox = sx - noseNeutral.x;
+  const oy = sy - noseNeutral.y;
 
-  if (calibrated && anchors.center) {
-    // Anchor-based detection:
-    // Measure how far current gaze is from center toward each direction anchor.
-    // Score = dot product of (gaze - center) with (anchor - center).
-    // Whichever direction scores highest wins, if it clears the threshold.
-    const c = anchors.center;
-    const dx = gaze.x - c.x;
-    const dy = gaze.y - c.y;
-
-    const scores = {};
-    for (const dir of ['up','down','left','right']) {
-      if (!anchors[dir]) continue;
-      const ax = anchors[dir].x - c.x;
-      const ay = anchors[dir].y - c.y;
-      const len = Math.sqrt(ax*ax + ay*ay) || 1;
-      // Normalized dot product — 1.0 means perfectly aligned with that anchor
-      scores[dir] = (dx*ax + dy*ay) / (len * len);
-    }
-
-    // Find best scoring direction
-    const best = Object.entries(scores).sort((a,b) => b[1]-a[1])[0];
-    if (!best || best[1] < 0.35) return null; // 0.35 = must be 35% of the way to the anchor
-
-    const map = { up:{x:0,y:-1}, down:{x:0,y:1}, left:{x:1,y:0}, right:{x:-1,y:0} };
-    return map[best[0]] || null;
-
+  // Strongest axis wins
+  if (Math.abs(ox) > Math.abs(oy)) {
+    if (ox >  HEAD_THRESH_X) return {x: -1, y:  0}; // head tilts right (mirrored) → go left...
+    if (ox < -HEAD_THRESH_X) return {x:  1, y:  0}; // actually let's keep intuitive
   } else {
-    // Pre-calibration fallback: simple offset from raw center (0.5, 0.0)
-    const dx = -(gaze.x - 0.5); // mirrored
-    const dy = gaze.y;           // already centered around ~0
-    if (Math.abs(dx) > Math.abs(dy)) {
-      if (Math.abs(dx) > fallback.threshX) return dx > 0 ? {x:1,y:0} : {x:-1,y:0};
-    } else {
-      if (Math.abs(dy) > fallback.threshY) return dy > 0 ? {x:0,y:1} : {x:0,y:-1};
-    }
-    return null;
+    if (oy >  HEAD_THRESH_Y) return {x:  0, y:  1};
+    if (oy < -HEAD_THRESH_Y) return {x:  0, y: -1};
+  }
+  return null;
+}
+
+function drawHeadOverlay(kp, d) {
+  // Draw nose dot + face outline (cheeks, chin, forehead)
+  const pts = [1, 10, 152, 234, 454];
+  for (const idx of pts) {
+    if (!kp[idx]) continue;
+    cc.fillStyle = d ? '#2e7d32' : '#f59e0b';
+    cc.beginPath(); cc.arc(kp[idx].x, kp[idx].y, idx === 1 ? 6 : 3, 0, Math.PI*2); cc.fill();
+  }
+  // Cross-hair on nose
+  if (kp[1]) {
+    const n = kp[1];
+    cc.strokeStyle = d ? '#2e7d32' : '#f59e0b';
+    cc.lineWidth = 2;
+    cc.beginPath(); cc.moveTo(n.x-10, n.y); cc.lineTo(n.x+10, n.y); cc.stroke();
+    cc.beginPath(); cc.moveTo(n.x, n.y-10); cc.lineTo(n.x, n.y+10); cc.stroke();
   }
 }
 
 // ── Hand tracking ─────────────────────────────────────────────────────────────
 function getHandDirection(kp) {
   const wrist = kp[0], tip = kp[8];
-  const dx = -(tip.x - wrist.x); // flip for mirrored canvas
+  const dx = -(tip.x - wrist.x);
   const dy = tip.y - wrist.y;
   if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? {x:1,y:0} : {x:-1,y:0};
   return dy > 0 ? {x:0,y:1} : {x:0,y:-1};
 }
 
+function drawHandSkeleton(kp) {
+  const C = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],
+             [0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
+  cc.strokeStyle = '#2e7d32'; cc.lineWidth = 2;
+  for (const [a,b] of C) {
+    cc.beginPath(); cc.moveTo(kp[a].x,kp[a].y); cc.lineTo(kp[b].x,kp[b].y); cc.stroke();
+  }
+  for (const p of kp) {
+    cc.fillStyle = '#fff';
+    cc.beginPath(); cc.arc(p.x,p.y,3,0,Math.PI*2); cc.fill();
+  }
+}
+
 // ── Detection loop ────────────────────────────────────────────────────────────
-// Uses setTimeout instead of rAF so async doesn't stack up concurrent calls
 async function detectionLoop() {
   if (detecting) { setTimeout(detectionLoop, 16); return; }
   detecting = true;
-
   try {
     cc.drawImage(video, 0, 0, 293, 220);
     let d = null;
@@ -296,11 +226,11 @@ async function detectionLoop() {
         d = getHandDirection(hands[0].keypoints);
         drawHandSkeleton(hands[0].keypoints);
       }
-    } else if (currentMode === 'eye' && faceDetector && !isCalibrating) {
+    } else if (currentMode === 'head' && faceDetector) {
       const faces = await faceDetector.estimateFaces(video);
       if (faces.length > 0) {
-        d = getEyeDirection(faces[0].keypoints);
-        drawIrisOverlay(faces[0].keypoints, d);
+        d = getHeadDirection(faces[0].keypoints);
+        drawHeadOverlay(faces[0].keypoints, d);
       }
     }
 
@@ -309,178 +239,24 @@ async function detectionLoop() {
       gestureDir = EMOJI[`${d.x},${d.y}`] || gestureDir;
     }
     document.getElementById('dirDisplay').textContent = gestureDir;
-  } catch(e) { console.warn('detection error:', e); }
+  } catch(e) { console.warn('detection:', e); }
 
   detecting = false;
   setTimeout(detectionLoop, 16);
 }
 
-// ── Calibration ───────────────────────────────────────────────────────────────
-function buildCalibDots() {
-  const layer = document.getElementById('calibDotLayer');
-  layer.innerHTML = ''; calibDotEls = [];
-  for (const pt of CALIB_POINTS) {
-    const d = document.createElement('div');
-    d.className = 'calibDot';
-    d.style.left = `${pt.x * 100}%`;
-    d.style.top  = `${pt.y * 100}%`;
-    layer.appendChild(d); calibDotEls.push(d);
-  }
-}
-
-async function startCalibration() {
-  console.log('startCalibration called, faceDetector:', faceDetector);
-  if (!faceDetector) {
-    document.getElementById('calibBtn').style.display = 'block';
-    document.getElementById('calibStatus').textContent = '⏳ Still loading model, try again in a moment...';
-    return;
-  }
-  isCalibrating = true;
-  calibrated = false;
-  anchors = { center:null, up:null, down:null, left:null, right:null };
-  gazeBuffer.length = 0;
-  document.getElementById('calibBtn').style.display = 'none';
-  document.getElementById('calibOverlay').classList.add('show');
-  buildCalibDots();
-
-  let allSamples;
-  try {
-  allSamples = CALIB_POINTS.map(() => []);
-
-  for (let i = 0; i < CALIB_POINTS.length; i++) {
-    const pt = CALIB_POINTS[i];
-    calibDotEls.forEach((d, j) => {
-      d.className = 'calibDot' + (j < i ? ' done' : j === i ? ' active' : '');
-    });
-    document.getElementById('calibStatus').textContent =
-      `${pt.hint} (${i + 1} / ${CALIB_POINTS.length})`;
-
-    // Brief pause so user can move eyes to the dot before sampling
-    await sleep(400);
-
-    const start = performance.now();
-    while (performance.now() - start < CALIB_HOLD_MS) {
-      const elapsed = performance.now() - start;
-      document.getElementById('calibBar').style.width =
-        `${((i + elapsed / CALIB_HOLD_MS) / CALIB_POINTS.length) * 100}%`;
-      try {
-        const faces = await faceDetector.estimateFaces(video);
-        if (faces.length > 0) {
-          const raw = extractRawGaze(faces[0].keypoints);
-          if (raw) allSamples[i].push(raw);
-        }
-      } catch(e) {}
-      await sleep(40);
-    }
-    calibDotEls[i].className = 'calibDot done';
-  }
-
-  applyCalibration(allSamples);
-  calibrated = true;
-  } catch(err) {
-    console.error('Calibration error:', err);
-    document.getElementById('calibStatus').textContent = `❌ Error: ${err.message}`;
-    document.getElementById('calibBtn').style.display = 'block';
-    isCalibrating = false;
-    return;
-  }
-  isCalibrating = false;
-  gazeBuffer.length = 0; // clear buffer so stale calibration readings don't pollute
-
-  document.getElementById('calibBar').style.width = '100%';
-  document.getElementById('calibStatus').textContent = '✅ Calibration complete!';
-  document.getElementById('recalibBtn').style.display = 'block';
-
-  await sleep(800);
-  document.getElementById('calibOverlay').classList.remove('show');
-}
-
-function trimmedMean(pts) {
-  if (pts.length < 3) return null;
-  const xs = pts.map(p => p.x).sort((a,b) => a-b);
-  const ys = pts.map(p => p.y).sort((a,b) => a-b);
-  const t = Math.max(1, Math.floor(pts.length * 0.2));
-  const tx = xs.slice(t, xs.length - t);
-  const ty = ys.slice(t, ys.length - t);
-  return {
-    x: tx.reduce((s,v)=>s+v,0) / tx.length,
-    y: ty.reduce((s,v)=>s+v,0) / ty.length,
-  };
-}
-
-function applyCalibration(samples) {
-  // Map each sample set to its anchor label
-  CALIB_POINTS.forEach((pt, i) => {
-    const avg = trimmedMean(samples[i]);
-    if (avg) anchors[pt.label] = avg;
-  });
-
-  if (!anchors.center) return;
-
-  console.log('Calibration anchors:', JSON.stringify(anchors));
-}
-
-// ── Drawing overlays ──────────────────────────────────────────────────────────
-function drawHandSkeleton(kp) {
-  const C = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],
-             [0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
-  cc.strokeStyle = '#2e7d32'; cc.lineWidth = 2;
-  for (const [a,b] of C) {
-    cc.beginPath(); cc.moveTo(kp[a].x,kp[a].y); cc.lineTo(kp[b].x,kp[b].y); cc.stroke();
-  }
-  for (const p of kp) {
-    cc.fillStyle = '#fff';
-    cc.beginPath(); cc.arc(p.x, p.y, 3, 0, Math.PI*2); cc.fill();
-  }
-}
-
-function drawIrisOverlay(kp, d) {
-  const lIris = kp[468], rIris = kp[473];
-  if (!lIris || !rIris) return;
-
-  // Eye corner dots
-  for (const idx of [33,133,362,263]) {
-    if (!kp[idx]) continue;
-    cc.fillStyle = 'rgba(46,125,50,0.5)';
-    cc.beginPath(); cc.arc(kp[idx].x, kp[idx].y, 2, 0, Math.PI*2); cc.fill();
-  }
-
-  // Iris rings — green = direction detected, amber = in deadzone
-  const stroke = d ? '#2e7d32' : '#f59e0b';
-  const fill   = d ? 'rgba(46,125,50,0.35)' : 'rgba(245,158,11,0.35)';
-  for (const iris of [lIris, rIris]) {
-    cc.strokeStyle = stroke; cc.lineWidth = 2;
-    cc.beginPath(); cc.arc(iris.x, iris.y, 9, 0, Math.PI*2); cc.stroke();
-    cc.fillStyle = fill;
-    cc.beginPath(); cc.arc(iris.x, iris.y, 5, 0, Math.PI*2); cc.fill();
-  }
-}
-
-// ── Mode switching ────────────────────────────────────────────────────────────
-async function switchMode(mode) {
+// ── Mode switching ─────────────────────────────────────────────────────────────
+function switchMode(mode) {
   currentMode = mode;
-  gazeBuffer.length = 0;
-  dirVotes = { dir: null, count: 0 };
+  noseBuffer.length = 0;
+  noseNeutral = null; // reset neutral on mode switch
   document.getElementById('btnHand').classList.toggle('active', mode === 'hand');
-  document.getElementById('btnEye').classList.toggle('active', mode === 'eye');
+  document.getElementById('btnHead').classList.toggle('active', mode === 'head');
   document.getElementById('instructions').innerHTML = INSTRUCTIONS[mode];
-  document.getElementById('recalibBtn').style.display = (mode === 'eye' && calibrated) ? 'block' : 'none';
-
-  if (mode === 'hand') {
-    document.getElementById('calibOverlay').classList.remove('show');
-  } else if (mode === 'eye' && !calibrated) {
-    document.getElementById('calibBtn').style.display = 'block';
-    document.getElementById('calibBar').style.width = '0%';
-    document.getElementById('calibStatus').textContent = faceDetector
-      ? 'Press Start to calibrate your gaze.'
-      : '⏳ Loading model... press Start when ready.';
-    document.getElementById('calibOverlay').classList.add('show');
-  }
 }
-
 switchMode('hand');
 
-// ── Game logic ────────────────────────────────────────────────────────────────
+// ── Game logic ─────────────────────────────────────────────────────────────────
 function randomFood() {
   return { x: Math.floor(Math.random()*COLS), y: Math.floor(Math.random()*ROWS) };
 }
@@ -503,11 +279,11 @@ function draw(ts) {
   gc.strokeStyle='#f0f4f0'; gc.lineWidth=1;
   for(let i=0;i<=COLS;i++){gc.beginPath();gc.moveTo(i*GRID,0);gc.lineTo(i*GRID,500);gc.stroke();}
   for(let j=0;j<=ROWS;j++){gc.beginPath();gc.moveTo(0,j*GRID);gc.lineTo(500,j*GRID);gc.stroke();}
-  const pulse = 0.5+0.5*Math.sin(ts/300);
+  const pulse=0.5+0.5*Math.sin(ts/300);
   gc.fillStyle=`rgba(229,57,53,${0.75+pulse*0.25})`;
   gc.beginPath();gc.arc(food.x*GRID+GRID/2,food.y*GRID+GRID/2,6+pulse*3,0,Math.PI*2);gc.fill();
   snake.forEach((seg,i)=>{
-    gc.fillStyle = i===0 ? '#2e7d32' : `hsl(122,55%,${35+i*1.2}%)`;
+    gc.fillStyle=i===0?'#2e7d32':`hsl(122,55%,${35+i*1.2}%)`;
     gc.beginPath();gc.roundRect(seg.x*GRID+2,seg.y*GRID+2,GRID-4,GRID-4,5);gc.fill();
   });
   document.getElementById('scoreDisplay').textContent=`Score: ${score}  |  Best: ${best}`;
@@ -529,32 +305,27 @@ document.addEventListener('keydown', e=>{
   if(d&&(d.x!==-direction.x||d.y!==-direction.y)) nextDirection=d;
 });
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
-
-async function setupCamera() {
-  const v = document.createElement('video');
-  v.width=293; v.height=220;
-  const stream = await navigator.mediaDevices.getUserMedia({video:true});
-  v.srcObject=stream;
-  await new Promise(r=>v.onloadedmetadata=r);
-  v.play(); return v;
-}
-
 // ── Boot ──────────────────────────────────────────────────────────────────────
 (async()=>{
-  const status = document.getElementById('status');
+  const status=document.getElementById('status');
   try {
     status.textContent='Loading models...';
     [video, handDetector, faceDetector] = await Promise.all([
-      setupCamera(),
+      (async()=>{
+        const v=document.createElement('video');
+        v.width=293; v.height=220;
+        const stream=await navigator.mediaDevices.getUserMedia({video:true});
+        v.srcObject=stream;
+        await new Promise(r=>v.onloadedmetadata=r);
+        v.play(); return v;
+      })(),
       handPoseDetection.createDetector(
         handPoseDetection.SupportedModels.MediaPipeHands,
         {runtime:'tfjs', modelType:'lite', maxHands:1}
       ),
       faceLandmarksDetection.createDetector(
         faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
-        {runtime:'tfjs', refineLandmarks:true, maxFaces:1}
+        {runtime:'tfjs', refineLandmarks:false, maxFaces:1}
       ),
     ]);
     status.textContent='✅ Ready — switch modes anytime';
