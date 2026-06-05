@@ -323,17 +323,14 @@
       const lGazeX = (lIris.x - lOuter.x) / lEyeW;
       const rGazeX = (rIris.x - rOuter.x) / rEyeW;
 
-      // Vertical: iris offset from eye CENTER, normalized by eye WIDTH
-      // Using eye width (not height) as the divisor means brow raises
-      // don't change the scale — eyelid landmarks move with brows but
-      // the horizontal eye width stays fixed to the bone.
-      const lTop = kp[159], lBot = kp[145];
-      const rTop = kp[386], rBot = kp[374];
-      const lEyeCenterY = (lTop.y + lBot.y) / 2;
-      const rEyeCenterY = (rTop.y + rBot.y) / 2;
-      // Divide by eye width so result is scale-independent
-      const lGazeY = (lIris.y - lEyeCenterY) / lEyeW; // negative=up, positive=down
-      const rGazeY = (rIris.y - rEyeCenterY) / rEyeW;
+      // Vertical: iris offset from the eye corner midpoint Y
+      // Eye corners (33, 133, 362, 263) are bone-fixed — they don't move
+      // when you raise your brows, so this reference is brow-independent.
+      // Normalize by eye width so the scale matches the horizontal axis.
+      const lCornerCenterY = (lOuter.y + lInner.y) / 2;
+      const rCornerCenterY = (rOuter.y + rInner.y) / 2;
+      const lGazeY = (lIris.y - lCornerCenterY) / (lEyeW * 0.4); // *0.4: iris moves less vertically, scale it up
+      const rGazeY = (rIris.y - rCornerCenterY) / (rEyeW * 0.4);
 
       return {
         x: (lGazeX + rGazeX) / 2,
@@ -353,17 +350,16 @@
       const nx = ((raw.x - gazeMinX) / rangeX) * 2 - 1; // -1=left, +1=right (mirrored)
       const ny = ((raw.y - gazeMinY) / rangeY) * 2 - 1; // -1=up,   +1=down
 
-      // Relative to snake: only trigger if gaze is clearly away from center
-      // Use a smaller deadzone so small movements count
-      const DEAD = 0.25;
+      // Separate deadzones: vertical needs lower threshold since eyes move less up/down
+      const DEAD_X = 0.25;
+      const DEAD_Y = 0.18;
 
-      // Which axis is stronger?
       if (Math.abs(nx) > Math.abs(ny)) {
-        if (nx >  DEAD) return { x: -1, y: 0 }; // mirrored: gaze right pixel → left
-        if (nx < -DEAD) return { x:  1, y: 0 };
+        if (nx >  DEAD_X) return { x: -1, y: 0 };
+        if (nx < -DEAD_X) return { x:  1, y: 0 };
       } else {
-        if (ny >  DEAD) return { x: 0, y: 1 };
-        if (ny < -DEAD) return { x: 0, y: -1 };
+        if (ny >  DEAD_Y) return { x: 0, y: 1 };
+        if (ny < -DEAD_Y) return { x: 0, y: -1 };
       }
       return null; // dead zone — hold current direction
     }
