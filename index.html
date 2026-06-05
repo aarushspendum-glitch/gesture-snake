@@ -326,8 +326,8 @@
         status.textContent = '✅ Hand tracking active — point your index finger to steer';
         runDetection(detector, video);
       } catch (err) {
-        status.textContent = '⚠️ No camera — use arrow keys to play';
-        console.warn(err);
+        status.textContent = `⚠️ ${err.message || err} — use arrow keys to play`;
+        console.error(err);
       }
       requestAnimationFrame(draw);
     })();
