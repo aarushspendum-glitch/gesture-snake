@@ -78,10 +78,10 @@
       </div>
       <div class="card" id="dirDisplay">👆</div>
       <div class="card">
-        <b>How to play:</b><br>
-        Point your index finger to steer.<br><br>
-        ☝️ up &nbsp; 👇 down<br>
-        👈 left &nbsp; 👉 right<br><br>
+        <b>Right hand:</b><br>
+        ☝️ up &nbsp; 👇 down &nbsp; 👈 left &nbsp; 👍 right<br><br>
+        <b>Left hand:</b><br>
+        ☝️ up &nbsp; 👇 down &nbsp; 👍 left &nbsp; 👉 right<br><br>
         Press <b>R</b> to restart.
       </div>
     </div>
@@ -137,19 +137,38 @@
       return detector;
     }
 
-    function getDirectionFromHand(keypoints) {
-      const wrist = keypoints[0];
-      const indexTip = keypoints[8];
-      const dx = indexTip.x - wrist.x;
+    function getDirectionFromHand(keypoints, handedness) {
+      // keypoint indices: 0=wrist, 4=thumb tip, 5=index MCP, 8=index tip
+      const wrist     = keypoints[0];
+      const thumbTip  = keypoints[4];
+      const indexMCP  = keypoints[5];
+      const indexTip  = keypoints[8];
+
+      // canvas is CSS-mirrored, so left/right in pixel space are flipped
+      // "right hand" from model = appears on left side of mirrored video
+      const isRightHand = handedness === 'Right';
+
+      // Check if thumb is sticking out sideways:
+      // For right hand (appears left on screen): thumb tip is to the LEFT of index MCP in pixel x
+      // For left hand (appears right on screen): thumb tip is to the RIGHT of index MCP in pixel x
+      const thumbExtended = isRightHand
+        ? (indexMCP.x - thumbTip.x) > 40   // thumb tip further left than index base
+        : (thumbTip.x - indexMCP.x) > 40;  // thumb tip further right than index base
+
+      if (thumbExtended) {
+        // Right hand thumb out = snake goes right; left hand thumb out = snake goes left
+        return isRightHand ? { x: 1, y: 0 } : { x: -1, y: 0 };
+      }
+
+      // Otherwise use index finger direction (up/down/left/right via pointing)
       const dy = indexTip.y - wrist.y;
+      const dx = indexTip.x - wrist.x; // in mirrored pixel space
 
-      // video is mirrored on display, flip dx for intuitive control
-      const realDx = -dx;
-
-      if (Math.abs(realDx) > Math.abs(dy)) {
-        return realDx > 0 ? { x: 1, y: 0 } : { x: -1, y: 0 };
+      if (Math.abs(dx) > Math.abs(dy)) {
+        // horizontal point — flip because canvas is mirrored
+        return dx < 0 ? { x: 1, y: 0 } : { x: -1, y: 0 };
       } else {
-        return dy > 0 ? { x: 0, y: 1 } : { x: 0, y: -1 };
+        return dy < 0 ? { x: 0, y: -1 } : { x: 0, y: 1 };
       }
     }
 
@@ -161,7 +180,8 @@
 
       if (hands.length > 0) {
         const kp = hands[0].keypoints;
-        const d = getDirectionFromHand(kp);
+        const handedness = hands[0].handedness;
+        const d = getDirectionFromHand(kp, handedness);
 
         // Don't allow reversing
         if (d.x !== -direction.x || d.y !== -direction.y) {
