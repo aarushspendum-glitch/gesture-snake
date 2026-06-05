@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gesture Snake</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0d0d0d;
+      color: #fff;
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 16px;
+    }
+    h1 { font-size: 1.6rem; letter-spacing: 2px; color: #00e676; }
+    #status {
+      font-size: 0.85rem;
+      color: #aaa;
+      height: 20px;
+    }
+    #arena {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    #gameCanvas {
+      border: 2px solid #222;
+      border-radius: 4px;
+    }
+    #camCanvas {
+      width: 240px;
+      height: 180px;
+      border: 2px solid #222;
+      border-radius: 4px;
+      transform: scaleX(-1);
+    }
+    #info {
+      width: 240px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .card {
+      background: #1a1a1a;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.8rem;
+      color: #ccc;
+      line-height: 1.6;
+    }
+    .card b { color: #00e676; }
+    #scoreDisplay {
+      font-size: 1.1rem;
+      color: #fff;
+    }
+    #dirDisplay {
+      font-size: 1.4rem;
+      text-align: center;
+      padding: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>GESTURE SNAKE</h1>
+  <div id="status">Loading hand tracking model...</div>
+
+  <div id="arena">
+    <canvas id="gameCanvas" width="500" height="500"></canvas>
+    <div id="info">
+      <canvas id="camCanvas" width="320" height="240"></canvas>
+      <div class="card">
+        <div id="scoreDisplay">Score: 0 &nbsp;|&nbsp; Best: 0</div>
+      </div>
+      <div class="card" id="dirDisplay">👆</div>
+      <div class="card">
+        <b>How to play:</b><br>
+        Point your index finger to steer.<br><br>
+        ☝️ up &nbsp; 👇 down<br>
+        👈 left &nbsp; 👉 right<br><br>
+        Press <b>R</b> to restart.
+      </div>
+    </div>
+  </div>
+
+  <!-- TensorFlow.js + MediaPipe Hands -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection"></script>
+
+  <script>
+    // ── Config ──────────────────────────────────────────────────────────────
+    const GRID = 25;
+    const COLS = 20;
+    const ROWS = 20;
+    const SPEED = 150; // ms per tick
+
+    // ── State ────────────────────────────────────────────────────────────────
+    let direction = { x: 1, y: 0 };
+    let nextDirection = { x: 1, y: 0 };
+    let snake = [{ x: 10, y: 10 }];
+    let food = randomFood();
+    let score = 0;
+    let best = 0;
+    let gameOver = false;
+    let lastTick = 0;
+    let gestureDir = '👆';
+
+    // ── Canvas setup ─────────────────────────────────────────────────────────
+    const gameCanvas = document.getElementById('gameCanvas');
+    const gc = gameCanvas.getContext('2d');
+    const camCanvas = document.getElementById('camCanvas');
+    const cc = camCanvas.getContext('2d');
+
+    // ── Hand tracking ────────────────────────────────────────────────────────
+    async function setupCamera() {
+      const video = document.createElement('video');
+      video.width = 320;
+      video.height = 240;
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+      await new Promise(r => video.onloadedmetadata = r);
+      video.play();
+      return video;
+    }
+
+    async function loadModel() {
+      const model = handPoseDetection.SupportedModels.MediaPipeHands;
+      const detector = await handPoseDetection.createDetector(model, {
+        runtime: 'tfjs',
+        modelType: 'lite',
+        maxHands: 1,
+      });
+      return detector;
+    }
+
+    function getDirectionFromHand(keypoints) {
+      const wrist = keypoints[0];
+      const indexTip = keypoints[8];
+      const dx = indexTip.x - wrist.x;
+      const dy = indexTip.y - wrist.y;
+
+      // video is mirrored on display, flip dx for intuitive control
+      const realDx = -dx;
+
+      if (Math.abs(realDx) > Math.abs(dy)) {
+        return realDx > 0 ? { x: 1, y: 0 } : { x: -1, y: 0 };
+      } else {
+        return dy > 0 ? { x: 0, y: 1 } : { x: 0, y: -1 };
+      }
+    }
+
+    const EMOJI = { '1,0': '👉', '-1,0': '👈', '0,1': '👇', '0,-1': '👆' };
+
+    async function runDetection(detector, video) {
+      const hands = await detector.estimateHands(video);
+      cc.drawImage(video, 0, 0, 320, 240);
+
+      if (hands.length > 0) {
+        const kp = hands[0].keypoints;
+        const d = getDirectionFromHand(kp);
+
+        // Don't allow reversing
+        if (d.x !== -direction.x || d.y !== -direction.y) {
+          nextDirection = d;
+        }
+
+        gestureDir = EMOJI[`${d.x},${d.y}`] || '👆';
+
+        // Draw skeleton
+        cc.strokeStyle = '#00e676';
+        cc.lineWidth = 2;
+        const connections = [
+          [0,1],[1,2],[2,3],[3,4],
+          [0,5],[5,6],[6,7],[7,8],
+          [0,9],[9,10],[10,11],[11,12],
+          [0,13],[13,14],[14,15],[15,16],
+          [0,17],[17,18],[18,19],[19,20],
+          [5,9],[9,13],[13,17],
+        ];
+        // mirror x for display
+        const mx = x => 320 - x;
+        for (const [a, b] of connections) {
+          cc.beginPath();
+          cc.moveTo(mx(kp[a].x), kp[a].y);
+          cc.lineTo(mx(kp[b].x), kp[b].y);
+          cc.stroke();
+        }
+        for (const p of kp) {
+          cc.fillStyle = '#fff';
+          cc.beginPath();
+          cc.arc(mx(p.x), p.y, 3, 0, Math.PI * 2);
+          cc.fill();
+        }
+      }
+
+      document.getElementById('dirDisplay').textContent = gestureDir;
+      requestAnimationFrame(() => runDetection(detector, video));
+    }
+
+    // ── Game logic ───────────────────────────────────────────────────────────
+    function randomFood() {
+      return {
+        x: Math.floor(Math.random() * COLS),
+        y: Math.floor(Math.random() * ROWS),
+      };
+    }
+
+    function resetGame() {
+      direction = { x: 1, y: 0 };
+      nextDirection = { x: 1, y: 0 };
+      snake = [{ x: 10, y: 10 }];
+      food = randomFood();
+      score = 0;
+      gameOver = false;
+    }
+
+    function tick() {
+      direction = { ...nextDirection };
+      const head = {
+        x: snake[0].x + direction.x,
+        y: snake[0].y + direction.y,
+      };
+
+      if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) {
+        gameOver = true; return;
+      }
+      if (snake.some(s => s.x === head.x && s.y === head.y)) {
+        gameOver = true; return;
+      }
+
+      snake.unshift(head);
+      if (head.x === food.x && head.y === food.y) {
+        score++;
+        if (score > best) best = score;
+        food = randomFood();
+      } else {
+        snake.pop();
+      }
+    }
+
+    function draw(ts) {
+      if (!gameOver && ts - lastTick > SPEED) {
+        tick();
+        lastTick = ts;
+      }
+
+      // Background
+      gc.fillStyle = '#0d0d0d';
+      gc.fillRect(0, 0, 500, 500);
+
+      // Grid lines (subtle)
+      gc.strokeStyle = '#161616';
+      gc.lineWidth = 0.5;
+      for (let i = 0; i <= COLS; i++) {
+        gc.beginPath(); gc.moveTo(i * GRID, 0); gc.lineTo(i * GRID, 500); gc.stroke();
+      }
+      for (let j = 0; j <= ROWS; j++) {
+        gc.beginPath(); gc.moveTo(0, j * GRID); gc.lineTo(500, j * GRID); gc.stroke();
+      }
+
+      // Food (pulsing)
+      const pulse = 0.5 + 0.5 * Math.sin(ts / 300);
+      const r = 6 + pulse * 3;
+      gc.fillStyle = `rgba(255, 80, 80, ${0.7 + pulse * 0.3})`;
+      gc.beginPath();
+      gc.arc(food.x * GRID + GRID / 2, food.y * GRID + GRID / 2, r, 0, Math.PI * 2);
+      gc.fill();
+
+      // Snake
+      snake.forEach((seg, i) => {
+        const green = Math.floor(180 + (i === 0 ? 75 : 0));
+        gc.fillStyle = i === 0 ? '#00e676' : `rgb(0, ${green - i * 3}, ${60 + i})`;
+        gc.beginPath();
+        gc.roundRect(seg.x * GRID + 2, seg.y * GRID + 2, GRID - 4, GRID - 4, 4);
+        gc.fill();
+      });
+
+      // Score
+      document.getElementById('scoreDisplay').textContent =
+        `Score: ${score}  |  Best: ${best}`;
+
+      // Game over overlay
+      if (gameOver) {
+        gc.fillStyle = 'rgba(0,0,0,0.6)';
+        gc.fillRect(0, 0, 500, 500);
+        gc.fillStyle = '#ff5252';
+        gc.font = 'bold 36px Segoe UI';
+        gc.textAlign = 'center';
+        gc.fillText('GAME OVER', 250, 220);
+        gc.fillStyle = '#aaa';
+        gc.font = '18px Segoe UI';
+        gc.fillText(`Score: ${score}`, 250, 265);
+        gc.fillStyle = '#00e676';
+        gc.fillText('Press R to restart', 250, 310);
+        gc.textAlign = 'left';
+      }
+
+      requestAnimationFrame(draw);
+    }
+
+    // ── Keyboard fallback ────────────────────────────────────────────────────
+    document.addEventListener('keydown', e => {
+      const map = {
+        ArrowUp:    { x: 0, y: -1 },
+        ArrowDown:  { x: 0, y: 1 },
+        ArrowLeft:  { x: -1, y: 0 },
+        ArrowRight: { x: 1, y: 0 },
+      };
+      if (e.key === 'r' || e.key === 'R') { resetGame(); return; }
+      const d = map[e.key];
+      if (d && (d.x !== -direction.x || d.y !== -direction.y)) {
+        nextDirection = d;
+      }
+    });
+
+    // ── Boot ─────────────────────────────────────────────────────────────────
+    (async () => {
+      const status = document.getElementById('status');
+      try {
+        const [video, detector] = await Promise.all([setupCamera(), loadModel()]);
+        status.textContent = '✅ Hand tracking active — point your index finger to steer';
+        runDetection(detector, video);
+      } catch (err) {
+        status.textContent = '⚠️ No camera — use arrow keys to play';
+        console.warn(err);
+      }
+      requestAnimationFrame(draw);
+    })();
+  </script>
+</body>
+</html>
