@@ -181,18 +181,16 @@
           [0,17],[17,18],[18,19],[19,20],
           [5,9],[9,13],[13,17],
         ];
-        // mirror x for display
-        const mx = x => 320 - x;
         for (const [a, b] of connections) {
           cc.beginPath();
-          cc.moveTo(mx(kp[a].x), kp[a].y);
-          cc.lineTo(mx(kp[b].x), kp[b].y);
+          cc.moveTo(kp[a].x, kp[a].y);
+          cc.lineTo(kp[b].x, kp[b].y);
           cc.stroke();
         }
         for (const p of kp) {
           cc.fillStyle = '#fff';
           cc.beginPath();
-          cc.arc(mx(p.x), p.y, 3, 0, Math.PI * 2);
+          cc.arc(p.x, p.y, 3, 0, Math.PI * 2);
           cc.fill();
         }
       }
