@@ -329,7 +329,10 @@ function buildCalibDots() {
 }
 
 async function startCalibration() {
-  if (!faceDetector) return;
+  if (!faceDetector) {
+    document.getElementById('calibStatus').textContent = '⏳ Still loading model, try again in a moment...';
+    return;
+  }
   isCalibrating = true;
   calibrated = false;
   anchors = { center:null, up:null, down:null, left:null, right:null };
@@ -454,10 +457,12 @@ async function switchMode(mode) {
 
   if (mode === 'hand') {
     document.getElementById('calibOverlay').classList.remove('show');
-  } else if (mode === 'eye' && !calibrated && faceDetector) {
+  } else if (mode === 'eye' && !calibrated) {
     document.getElementById('calibBtn').style.display = 'block';
     document.getElementById('calibBar').style.width = '0%';
-    document.getElementById('calibStatus').textContent = 'Press Start to calibrate your gaze.';
+    document.getElementById('calibStatus').textContent = faceDetector
+      ? 'Press Start to calibrate your gaze.'
+      : '⏳ Loading model... press Start when ready.';
     document.getElementById('calibOverlay').classList.add('show');
   }
 }
