@@ -329,7 +329,9 @@ function buildCalibDots() {
 }
 
 async function startCalibration() {
+  console.log('startCalibration called, faceDetector:', faceDetector);
   if (!faceDetector) {
+    document.getElementById('calibBtn').style.display = 'block';
     document.getElementById('calibStatus').textContent = '⏳ Still loading model, try again in a moment...';
     return;
   }
@@ -341,7 +343,9 @@ async function startCalibration() {
   document.getElementById('calibOverlay').classList.add('show');
   buildCalibDots();
 
-  const allSamples = CALIB_POINTS.map(() => []);
+  let allSamples;
+  try {
+  allSamples = CALIB_POINTS.map(() => []);
 
   for (let i = 0; i < CALIB_POINTS.length; i++) {
     const pt = CALIB_POINTS[i];
@@ -373,6 +377,13 @@ async function startCalibration() {
 
   applyCalibration(allSamples);
   calibrated = true;
+  } catch(err) {
+    console.error('Calibration error:', err);
+    document.getElementById('calibStatus').textContent = `❌ Error: ${err.message}`;
+    document.getElementById('calibBtn').style.display = 'block';
+    isCalibrating = false;
+    return;
+  }
   isCalibrating = false;
   gazeBuffer.length = 0; // clear buffer so stale calibration readings don't pollute
 
