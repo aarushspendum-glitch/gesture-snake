@@ -65,65 +65,65 @@
     #dirDisplay { font-size: 1.6rem; text-align: center; }
 
     /* Calibration overlay */
+    /* Calibration lives ON TOP of the game canvas */
+    #gameWrap {
+      position: relative;
+      width: 500px; height: 500px;
+    }
     #calibOverlay {
       display: none;
-      position: fixed;
+      position: absolute;
       inset: 0;
-      background: rgba(240,244,240,0.97);
+      background: rgba(255,255,255,0.93);
+      border-radius: 10px;
+      z-index: 10;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      z-index: 100;
-      gap: 20px;
+      justify-content: flex-end;
+      padding-bottom: 22px;
+      gap: 10px;
     }
     #calibOverlay.show { display: flex; }
-    #calibTitle { font-size: 1.4rem; font-weight: 700; color: #2e7d32; }
-    #calibSub { font-size: 0.95rem; color: #555; max-width: 420px; text-align: center; }
-    #calibScreen {
-      position: relative;
-      width: 600px; height: 400px;
-      background: #fff;
-      border-radius: 16px;
-      border: 2px solid #c8e6c9;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-      overflow: hidden;
+    #calibDotLayer {
+      position: absolute;
+      inset: 0;
     }
     .calibDot {
       position: absolute;
-      width: 28px; height: 28px;
+      width: 24px; height: 24px;
       border-radius: 50%;
       background: #c8e6c9;
       border: 3px solid #a5d6a7;
       transform: translate(-50%, -50%);
-      transition: background 0.3s, transform 0.3s;
+      transition: background 0.25s, transform 0.25s;
     }
     .calibDot.active {
       background: #2e7d32;
       border-color: #1b5e20;
-      transform: translate(-50%, -50%) scale(1.3);
+      transform: translate(-50%, -50%) scale(1.4);
+      box-shadow: 0 0 0 6px rgba(46,125,50,0.2);
     }
-    .calibDot.done {
-      background: #81c784;
-      border-color: #4caf50;
-    }
+    .calibDot.done { background: #81c784; border-color: #4caf50; }
     #calibProgress {
-      width: 600px; height: 8px;
+      width: 380px; height: 7px;
       background: #e8f5e9; border-radius: 4px; overflow: hidden;
     }
     #calibBar {
       height: 100%; background: #2e7d32; border-radius: 4px;
-      transition: width 0.1s linear;
-      width: 0%;
+      transition: width 0.08s linear; width: 0%;
     }
+    #calibStatus { font-size: 0.8rem; color: #444; font-weight: 600; }
     #calibBtn {
-      padding: 12px 32px;
+      padding: 10px 28px;
       background: #2e7d32; color: #fff;
       border: none; border-radius: 10px;
-      font-size: 1rem; font-weight: 700;
+      font-size: 0.95rem; font-weight: 700;
       cursor: pointer;
       box-shadow: 0 2px 8px rgba(46,125,50,0.3);
     }
     #calibBtn:hover { background: #1b5e20; }
+    #calibTitle { font-size: 1.1rem; font-weight: 700; color: #2e7d32; }
+    #calibSub { font-size: 0.78rem; color: #555; text-align: center; max-width: 340px; }
     #recalibBtn {
       padding: 6px 16px;
       background: transparent; color: #2e7d32;
@@ -146,7 +146,20 @@
   <div id="status">Loading models...</div>
 
   <div id="arena">
-    <canvas id="gameCanvas" width="500" height="500"></canvas>
+    <div id="gameWrap">
+      <canvas id="gameCanvas" width="500" height="500"></canvas>
+
+      <!-- Calibration overlay sits on top of the game canvas -->
+      <div id="calibOverlay">
+        <div id="calibDotLayer"><!-- dots injected by JS --></div>
+        <div id="calibTitle">👁 Eye Calibration</div>
+        <div id="calibSub">Keep your head still. Look at each dot as it lights up — the dots are on the game board so your gaze is calibrated exactly where you'll be playing.</div>
+        <div id="calibProgress"><div id="calibBar"></div></div>
+        <div id="calibStatus"></div>
+        <button id="calibBtn" onclick="startCalibration()">Start Calibration</button>
+      </div>
+    </div>
+
     <div id="sidebar">
       <canvas id="camCanvas" width="293" height="220"></canvas>
       <div class="card"><div id="scoreDisplay">Score: 0 &nbsp;|&nbsp; Best: 0</div></div>
@@ -154,18 +167,6 @@
       <div class="card" id="instructions"></div>
       <button id="recalibBtn" style="display:none" onclick="startCalibration()">🔄 Recalibrate Eyes</button>
     </div>
-  </div>
-
-  <!-- Calibration overlay -->
-  <div id="calibOverlay">
-    <div id="calibTitle">👁 Eye Calibration</div>
-    <div id="calibSub">Look at each green dot as it lights up. Hold your gaze until it moves to the next one.</div>
-    <div id="calibScreen">
-      <!-- dots injected by JS -->
-    </div>
-    <div id="calibProgress"><div id="calibBar"></div></div>
-    <div id="calibStatus" style="font-size:0.85rem;color:#555;"></div>
-    <button id="calibBtn" onclick="startCalibration()">Start Calibration</button>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
@@ -201,34 +202,39 @@
     let gazeMinX = 0.3, gazeMaxX = 0.7; // fallback defaults
     let gazeMinY = 0.3, gazeMaxY = 0.7;
 
-    // Calibration points: [screenXpct, screenYpct, label]
+    // Calibration points on the game canvas [xPct, yPct]
+    // More points = more accurate mapping, especially near center
     const CALIB_POINTS = [
-      [0.5,  0.5,  'center'],
-      [0.1,  0.1,  'top-left'],
-      [0.9,  0.1,  'top-right'],
-      [0.1,  0.9,  'bottom-left'],
-      [0.9,  0.9,  'bottom-right'],
-      [0.5,  0.1,  'top'],
-      [0.5,  0.9,  'bottom'],
-      [0.1,  0.5,  'left'],
-      [0.9,  0.5,  'right'],
+      [0.5,  0.5 ],  // center — most important, do first
+      [0.5,  0.08],  // top center
+      [0.5,  0.92],  // bottom center
+      [0.08, 0.5 ],  // left center
+      [0.92, 0.5 ],  // right center
+      [0.08, 0.08],  // top-left
+      [0.92, 0.08],  // top-right
+      [0.08, 0.92],  // bottom-left
+      [0.92, 0.92],  // bottom-right
+      [0.5,  0.3 ],  // upper-mid
+      [0.5,  0.7 ],  // lower-mid
+      [0.3,  0.5 ],  // left-mid
+      [0.7,  0.5 ],  // right-mid
     ];
 
     let isCalibrating = false;
     let calibState = { running: false, step: -1, samples: [], dotEls: [] };
-    const CALIB_HOLD_MS = 1200; // ms to stare at each dot
-    const CALIB_SAMPLES = 20;   // samples to average per dot
+    const CALIB_HOLD_MS = 1500; // ms per dot — longer = more accurate
+    const CALIB_SAMPLES = 30;
 
     function buildCalibDots() {
-      const screen = document.getElementById('calibScreen');
-      screen.innerHTML = '';
+      const layer = document.getElementById('calibDotLayer');
+      layer.innerHTML = '';
       calibState.dotEls = [];
       for (const [px, py] of CALIB_POINTS) {
         const d = document.createElement('div');
         d.className = 'calibDot';
         d.style.left = `${px * 100}%`;
         d.style.top  = `${py * 100}%`;
-        screen.appendChild(d);
+        layer.appendChild(d);
         calibState.dotEls.push(d);
       }
     }
