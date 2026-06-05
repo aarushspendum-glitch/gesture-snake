@@ -87,6 +87,7 @@
     #calibDotLayer {
       position: absolute;
       inset: 0;
+      pointer-events: none;
     }
     .calibDot {
       position: absolute;
@@ -459,8 +460,10 @@
       document.getElementById('instructions').innerHTML = INSTRUCTIONS[mode];
       document.getElementById('recalibBtn').style.display = (mode === 'eye' && calibrated) ? 'block' : 'none';
 
-      if (mode === 'eye' && !calibrated && faceDetector) {
-        // Show calibration overlay
+      if (mode === 'hand') {
+        // Always hide calibration when switching to hand
+        document.getElementById('calibOverlay').classList.remove('show');
+      } else if (mode === 'eye' && !calibrated && faceDetector) {
         document.getElementById('calibBtn').style.display = 'block';
         document.getElementById('calibBar').style.width = '0%';
         document.getElementById('calibStatus').textContent = 'Press Start to calibrate your gaze.';
