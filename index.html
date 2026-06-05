@@ -214,6 +214,7 @@
       [0.9,  0.5,  'right'],
     ];
 
+    let isCalibrating = false;
     let calibState = { running: false, step: -1, samples: [], dotEls: [] };
     const CALIB_HOLD_MS = 1200; // ms to stare at each dot
     const CALIB_SAMPLES = 20;   // samples to average per dot
@@ -234,6 +235,7 @@
 
     async function startCalibration() {
       if (!faceDetector) return;
+      isCalibrating = true;  // pause game input
       document.getElementById('calibBtn').style.display = 'none';
       document.getElementById('calibOverlay').classList.add('show');
       buildCalibDots();
@@ -275,6 +277,7 @@
 
       await sleep(800);
       document.getElementById('calibOverlay').classList.remove('show');
+      isCalibrating = false;  // resume game input
     }
 
     function applyCalibration(samples) {
@@ -312,22 +315,25 @@
       const lIris = kp[468], rIris = kp[473];
       if (!lIris || !rIris) return null;
 
-      // Eye corners
+      // Horizontal: iris relative to eye corners (bone-fixed, very stable)
       const lOuter = kp[33],  lInner = kp[133];
       const rOuter = kp[362], rInner = kp[263];
-      const lTop   = kp[159], lBot   = kp[145];
-      const rTop   = kp[386], rBot   = kp[374];
-
       const lEyeW = Math.abs(lInner.x - lOuter.x) || 1;
       const rEyeW = Math.abs(rInner.x - rOuter.x) || 1;
-      const lEyeH = Math.abs(lBot.y   - lTop.y)   || 1;
-      const rEyeH = Math.abs(rBot.y   - rTop.y)   || 1;
-
-      // Normalized iris position within each eye [0..1]
       const lGazeX = (lIris.x - lOuter.x) / lEyeW;
       const rGazeX = (rIris.x - rOuter.x) / rEyeW;
-      const lGazeY = (lIris.y - lTop.y)   / lEyeH;
-      const rGazeY = (rIris.y - rTop.y)   / rEyeH;
+
+      // Vertical: iris offset from eye CENTER, normalized by eye WIDTH
+      // Using eye width (not height) as the divisor means brow raises
+      // don't change the scale — eyelid landmarks move with brows but
+      // the horizontal eye width stays fixed to the bone.
+      const lTop = kp[159], lBot = kp[145];
+      const rTop = kp[386], rBot = kp[374];
+      const lEyeCenterY = (lTop.y + lBot.y) / 2;
+      const rEyeCenterY = (rTop.y + rBot.y) / 2;
+      // Divide by eye width so result is scale-independent
+      const lGazeY = (lIris.y - lEyeCenterY) / lEyeW; // negative=up, positive=down
+      const rGazeY = (rIris.y - rEyeCenterY) / rEyeW;
 
       return {
         x: (lGazeX + rGazeX) / 2,
@@ -393,7 +399,7 @@
         }
       }
 
-      if (d && (d.x !== -direction.x || d.y !== -direction.y)) {
+      if (!isCalibrating && d && (d.x !== -direction.x || d.y !== -direction.y)) {
         nextDirection = d;
         gestureDir = EMOJI[`${d.x},${d.y}`] || gestureDir;
       }
