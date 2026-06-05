@@ -351,7 +351,7 @@
       const ny = ((raw.y - gazeMinY) / rangeY) * 2 - 1; // -1=up,   +1=down
 
       // Separate deadzones: vertical needs lower threshold since eyes move less up/down
-      const DEAD_X = 0.38;
+      const DEAD_X = 0.30;
       const DEAD_Y = 0.18;
 
       if (Math.abs(nx) > Math.abs(ny)) {
